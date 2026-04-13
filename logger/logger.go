@@ -48,9 +48,11 @@ type Logger struct {
 }
 
 var (
-	globalLevel  = LevelInfo
-	globalOutput = defaultOutput
-	mu           sync.RWMutex
+	globalLevel          = LevelInfo
+	globalOutput         = defaultOutput
+	globalShowLibrary    = true
+	defaultLibraryPrefix = "[yuanbao] "
+	mu                   sync.RWMutex
 )
 
 func defaultOutput(entry LogEntry) {
@@ -69,7 +71,14 @@ func defaultOutput(entry LogEntry) {
 		msg = msg + " " + fields
 	}
 
-	fmt.Printf("%s [%s] [%s] %s\n",
+	// 是否显示前缀
+	libraryPrefix := ""
+	if globalShowLibrary {
+		libraryPrefix = defaultLibraryPrefix
+	}
+
+	fmt.Printf("%s%s [%s] [%s] %s\n",
+		libraryPrefix,
 		entry.Time,
 		entry.Level.String(),
 		entry.Module,
@@ -81,6 +90,12 @@ func SetLevel(level Level) {
 	mu.Lock()
 	defer mu.Unlock()
 	globalLevel = level
+}
+
+func SetShowLibrary(show bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	globalShowLibrary = show
 }
 
 func SetLevelByName(name string) error {
@@ -117,6 +132,18 @@ func New(module string) *Logger {
 			globalOutput(entry)
 		},
 	}
+}
+
+var defaultLogger *Logger
+
+func GetLogger(module string) *Logger {
+	if module == "" {
+		if defaultLogger == nil {
+			defaultLogger = New("app")
+		}
+		return defaultLogger
+	}
+	return New(module)
 }
 
 func (l *Logger) log(level Level, msg string, fields map[string]any) {
