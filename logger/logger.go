@@ -83,6 +83,24 @@ func SetLevel(level Level) {
 	globalLevel = level
 }
 
+func SetLevelByName(name string) error {
+	var lvl Level
+	switch strings.ToUpper(name) {
+	case "DEBUG":
+		lvl = LevelDebug
+	case "INFO":
+		lvl = LevelInfo
+	case "WARN":
+		lvl = LevelWarn
+	case "ERROR":
+		lvl = LevelError
+	default:
+		return fmt.Errorf("unsupported log level: %s", name)
+	}
+	SetLevel(lvl)
+	return nil
+}
+
 func SetOutput(output func(entry LogEntry)) {
 	mu.Lock()
 	defer mu.Unlock()
