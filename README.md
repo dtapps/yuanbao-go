@@ -233,16 +233,6 @@ type MsgContent struct {
 }
 ```
 
-## 示例程序
-
-运行示例程序：
-
-```bash
-export YUANBAO_APP_KEY=your-app-key
-export YUANBAO_APP_SECRET=your-app-secret
-go run ./cmd/example/main.go
-```
-
 ## 许可证
 
 MIT License

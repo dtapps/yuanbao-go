@@ -9,37 +9,11 @@ import (
 	"github.com/dtapps/yuanbao-go/types"
 )
 
-// ExtractResult 提取结果
-type ExtractResult struct {
-	RawBody     string
-	Text        string
-	Medias      []MediaInfo
-	IsAtBot     bool
-	Mentions    []MentionInfo
-	BotUsername string
-}
-
-// MediaInfo 媒体信息
-type MediaInfo struct {
-	Type     string
-	URL      string
-	UUID     string
-	Size     uint32
-	FileName string
-}
-
-// MentionInfo @提及信息
-type MentionInfo struct {
-	UserID   string
-	NickName string
-	Text     string
-}
-
 // ExtractTextFromMsgBody 从消息体提取文本
-func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) ExtractResult {
-	result := ExtractResult{
-		Medias:   make([]MediaInfo, 0),
-		Mentions: make([]MentionInfo, 0),
+func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) types.ExtractResult {
+	result := types.ExtractResult{
+		Medias:   make([]types.MediaInfo, 0),
+		Mentions: make([]types.MentionInfo, 0),
 	}
 
 	var textParts []string
@@ -71,7 +45,7 @@ func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) ExtractResult {
 			}
 
 		case "TIMImageElem":
-			media := MediaInfo{
+			media := types.MediaInfo{
 				Type: "image",
 				URL:  elem.MsgContent.URL,
 				UUID: elem.MsgContent.UUID,
@@ -79,7 +53,7 @@ func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) ExtractResult {
 			result.Medias = append(result.Medias, media)
 
 		case "TIMFileElem":
-			media := MediaInfo{
+			media := types.MediaInfo{
 				Type:     "file",
 				UUID:     elem.MsgContent.UUID,
 				FileName: elem.MsgContent.FileName,
@@ -88,14 +62,14 @@ func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) ExtractResult {
 			result.Medias = append(result.Medias, media)
 
 		case "TIMVideoFileElem":
-			media := MediaInfo{
+			media := types.MediaInfo{
 				Type: "video",
 				UUID: elem.MsgContent.UUID,
 			}
 			result.Medias = append(result.Medias, media)
 
 		case "TIMSoundElem":
-			media := MediaInfo{
+			media := types.MediaInfo{
 				Type: "sound",
 				UUID: elem.MsgContent.UUID,
 			}

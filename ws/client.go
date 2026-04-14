@@ -96,8 +96,6 @@ type WsClient struct {
 
 	// 连接ID
 	connectId string
-
-	lastHeartbeatAck time.Time
 }
 
 // PendingRequest 待响应的请求
@@ -223,7 +221,6 @@ func (c *WsClient) readLoop() {
 				return
 			}
 
-			// 调试：打印原始消息
 			c.log.Debug("收到原始消息", logger.F("length", len(data)))
 
 			c.handleMessage(data)
@@ -732,8 +729,6 @@ func (c *WsClient) refreshTokenAndReconnect() {
 
 // getReconnectDelay 获取重连延迟
 func (c *WsClient) getReconnectDelay() time.Duration {
-	// c.mu.RLock()
-	// defer c.mu.RUnlock()
 
 	delays := c.reconnectDelays
 	index := c.reconnectAttempts
@@ -1105,51 +1100,6 @@ func (c *WsClient) decodePB(name string, data []byte) (goproto.Message, error) {
 	return proto.DecodePB(name, data)
 }
 
-// 解码响应
-func (c *WsClient) decodeSendC2CMessageRsp(data []byte, msgId string) any {
-	c.log.Info("开始解码响应", logger.F("msgId", msgId), logger.F("dataLen", len(data)))
-
-	rsp, err := c.decodePB("trpc.yuanbao.yuanbao_conn.yuanbao_openclaw_proxy.SendC2CMessageRsp", data)
-	if err != nil {
-		c.log.Error("PB解码失败", logger.F("error", err.Error()))
-		return nil
-	}
-
-	if r, ok := rsp.(*proto.SendC2CMessageRspWrapper); ok {
-		c.log.Info("解码成功", logger.F("Code", r.Code), logger.F("Message", r.Message))
-		return &types.SendMessageResult{
-			MsgID:   msgId,
-			Code:    r.Code,
-			Message: r.Message,
-		}
-	}
-
-	c.log.Error("类型断言失败")
-	return nil
-}
-
-func (c *WsClient) decodeSendGroupMessageRsp(data []byte, msgId string) any {
-	c.log.Info("解码群消息响应", logger.F("msgId", msgId), logger.F("dataLen", len(data)))
-
-	rsp, err := c.decodePB("trpc.yuanbao.yuanbao_conn.yuanbao_openclaw_proxy.SendGroupMessageRsp", data)
-	if err != nil {
-		c.log.Error("PB解码失败", logger.F("error", err.Error()))
-		return nil
-	}
-
-	if r, ok := rsp.(*proto.SendGroupMessageRspWrapper); ok {
-		c.log.Info("群消息解码成功", logger.F("Code", r.Code), logger.F("Message", r.Message))
-		return &types.SendMessageResult{
-			MsgID:   msgId,
-			Code:    r.Code,
-			Message: r.Message,
-		}
-	}
-
-	c.log.Error("类型断言失败")
-	return nil
-}
-
 func (c *WsClient) decodeQueryGroupInfoRsp(result any) (*types.QueryGroupInfoResult, error) {
 	rsp, ok := result.(*proto.QueryGroupInfoRspWrapper)
 	if !ok {
@@ -1239,8 +1189,6 @@ func (c *WsClient) nextSeqNo() uint32 {
 	}
 	return c.seqNo
 }
-
-// 辅助函数
 
 func parseDelays(s string) []time.Duration {
 	parts := strings.Split(s, ",")
@@ -1748,31 +1696,4 @@ func (c *WsClient) sendBusinessConnMsg(cmd, module, msgId string, data []byte) e
 
 	c.log.Info("消息已发送，等待响应...", logger.F("msgId", msgId))
 	return nil
-}
-
-// client.go 末尾
-func (c *WsClient) handleBusinessRsp(head *proto.HeadWrapper, data []byte) {
-	c.mu.Lock()
-	pending, ok := c.pendingRequests[head.MsgId]
-	if ok {
-		delete(c.pendingRequests, head.MsgId)
-	}
-	c.mu.Unlock()
-
-	if !ok {
-		c.log.Warn("收到回包但找不到对应的本地请求", logger.F("msgId", head.MsgId), logger.F("cmd", head.Cmd))
-		return
-	}
-
-	if pending.decoder != nil {
-		result := pending.decoder(data, head.MsgId)
-		// 打印解码结果，方便排查
-		c.log.Info("回包解析完成", logger.F("msgId", head.MsgId))
-
-		select {
-		case pending.resolveCh <- result:
-		default:
-			c.log.Error("resolveCh 写入失败", logger.F("msgId", head.MsgId))
-		}
-	}
 }

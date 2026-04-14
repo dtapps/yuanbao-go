@@ -6,13 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dtapps/yuanbao-go/account"
-	"github.com/dtapps/yuanbao-go/config"
 	"github.com/dtapps/yuanbao-go/http"
 	"github.com/dtapps/yuanbao-go/logger"
 	"github.com/dtapps/yuanbao-go/member"
 	"github.com/dtapps/yuanbao-go/message"
-	"github.com/dtapps/yuanbao-go/outbound"
 	"github.com/dtapps/yuanbao-go/types"
 	"github.com/dtapps/yuanbao-go/ws"
 )
@@ -22,12 +19,11 @@ type Plugin struct {
 	name      string
 	version   string
 	accountId string
-	account   *account.Account
-	config    *config.Config
+	account   *types.Account
+	config    *types.Config
 	client    *ws.WsClient
 	runtime   *Runtime
 	log       *logger.Logger
-	mu        sync.RWMutex
 	ctx       context.Context
 	cancel    context.CancelFunc
 }
@@ -51,7 +47,7 @@ type ChannelRuntime struct {
 }
 
 // NewPlugin 创建插件
-func NewPlugin(accountId string, account *account.Account, cfg *config.Config) *Plugin {
+func NewPlugin(accountId string, account *types.Account, cfg *types.Config) *Plugin {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Plugin{
@@ -69,11 +65,11 @@ func NewPlugin(accountId string, account *account.Account, cfg *config.Config) *
 // Start 启动插件
 func (p *Plugin) Start() error {
 	p.log.Info("启动元宝插件", logger.F("accountId", p.accountId))
-	p.log.Info("配置信息", map[string]any{
-		"appKey":    maskString(p.account.AppKey),
-		"appSecret": maskString(p.account.AppSecret),
-		"apiDomain": p.account.ApiDomain,
-	})
+	p.log.Info("配置信息",
+		logger.F("appKey", maskString(p.account.AppKey)),
+		logger.F("appSecret", maskString(p.account.AppSecret)),
+		logger.F("apiDomain", p.account.ApiDomain),
+	)
 
 	// 创建HTTP客户端
 	httpClient := http.NewClient(p.account)
@@ -104,14 +100,6 @@ func (p *Plugin) Start() error {
 	// 设置重连配置
 	p.client.SetReconnectConfig(p.account.WsMaxReconnectAttempts, "1s,2s,5s,10s,30s,60s")
 
-	// 初始化出站队列
-	outbound.InitQueue(p.accountId, &outbound.QueueConfig{
-		Strategy:  "merge-text",
-		MaxChars:  p.account.MaxChars,
-		MinChars:  p.account.HistoryLimit,
-		ChunkText: outbound.ChunkMarkdownText,
-	})
-
 	// 启动客户端
 	return p.client.Connect()
 }
@@ -121,9 +109,6 @@ func (p *Plugin) Stop() error {
 	p.log.Info("停止元宝插件", logger.F("accountId", p.accountId))
 
 	p.cancel()
-
-	// 销毁出站队列
-	outbound.DestroyQueue(p.accountId)
 
 	// 移除成员管理
 	member.RemoveMember(p.accountId)
@@ -149,11 +134,9 @@ func (p *Plugin) GetState() string {
 	return p.client.GetState()
 }
 
-// WsClientCallback 实现
-
 // OnReady 连接就绪
 func (p *Plugin) OnReady(data *types.AuthReadyData) {
-	p.log.Info("WebSocket连接就绪", map[string]any{"connectId": data.ConnectId})
+	p.log.Info("WebSocket连接就绪", logger.F("connectId", data.ConnectId))
 
 	if p.runtime != nil && p.runtime.onConnected != nil {
 		p.runtime.onConnected()
@@ -162,7 +145,10 @@ func (p *Plugin) OnReady(data *types.AuthReadyData) {
 
 // OnDispatch 消息推送
 func (p *Plugin) OnDispatch(pushEvent *ws.PushEvent) {
-	p.log.Debug("收到推送", map[string]any{"cmd": pushEvent.Cmd, "module": pushEvent.Module})
+	p.log.Debug("收到推送",
+		logger.F("cmd", pushEvent.Cmd),
+		logger.F("module", pushEvent.Module),
+	)
 
 	// 解析消息
 	msg := p.decodePushEvent(pushEvent)
@@ -181,7 +167,10 @@ func (p *Plugin) OnDispatch(pushEvent *ws.PushEvent) {
 		return
 	}
 
-	p.log.Info("收到消息", map[string]any{"chatType": chatType, "from": msg.FromAccount})
+	p.log.Info("收到消息",
+		logger.F("chatType", chatType),
+		logger.F("from", msg.FromAccount),
+	)
 
 	// 调用消息处理回调
 	if p.runtime != nil && p.runtime.onMessage != nil {
@@ -205,12 +194,18 @@ func (p *Plugin) OnError(err error) {
 
 // OnClose 关闭
 func (p *Plugin) OnClose(code int, reason string) {
-	p.log.Info("WebSocket关闭", map[string]any{"code": code, "reason": reason})
+	p.log.Info("WebSocket关闭",
+		logger.F("code", code),
+		logger.F("reason", reason),
+	)
 }
 
 // OnKickout 被踢
 func (p *Plugin) OnKickout(data *types.KickoutMsg) {
-	p.log.Warn("被踢下线", map[string]any{"status": data.Status, "reason": data.Reason})
+	p.log.Warn("被踢下线",
+		logger.F("status", data.Status),
+		logger.F("reason", data.Reason),
+	)
 }
 
 // OnAuthFailed 认证失败
@@ -276,13 +271,20 @@ func (p *Plugin) decodeFromContent(content string) *types.InboundMessage {
 func (p *Plugin) SendMessage(to string, text string) (*message.SendResult, error) {
 	if p.client == nil || p.client.GetState() != "connected" {
 		p.log.Warn("发送消息失败：未连接")
-		return &message.SendResult{Ok: false, Error: fmt.Errorf("not connected")}, nil
+		return &message.SendResult{
+			Ok:    false,
+			Error: fmt.Errorf("not connected"),
+		}, nil
 	}
 
 	// 解析目标
 	chatType, targetId := parseTarget(to)
 
-	p.log.Debug("发送消息", logger.F("chatType", chatType), logger.F("target", targetId), logger.F("text", text))
+	p.log.Debug("发送消息",
+		logger.F("chatType", chatType),
+		logger.F("target", targetId),
+		logger.F("text", text),
+	)
 
 	msgBody := message.BuildOutboundMsgBodyFromText(text)
 
@@ -400,7 +402,7 @@ func NewPluginManager() *PluginManager {
 }
 
 // CreatePlugin 创建插件
-func (m *PluginManager) CreatePlugin(accountId string, account *account.Account, cfg *config.Config) *Plugin {
+func (m *PluginManager) CreatePlugin(accountId string, account *types.Account, cfg *types.Config) *Plugin {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -464,10 +466,8 @@ func GetPluginManager() *PluginManager {
 	return globalPluginManager
 }
 
-// 便捷函数
-
 // CreateAndStart 创建并启动插件
-func CreateAndStart(accountId string, account *account.Account, cfg *config.Config) (*Plugin, error) {
+func CreateAndStart(accountId string, account *types.Account, cfg *types.Config) (*Plugin, error) {
 	manager := GetPluginManager()
 	plugin := manager.CreatePlugin(accountId, account, cfg)
 
@@ -489,7 +489,7 @@ func GetPluginByAccountId(accountId string) *Plugin {
 }
 
 // RunWithContext 运行直到上下文取消
-func RunWithContext(ctx context.Context, accountId string, account *account.Account, cfg *config.Config) error {
+func RunWithContext(ctx context.Context, accountId string, account *types.Account, cfg *types.Config) error {
 	plugin, err := CreateAndStart(accountId, account, cfg)
 	if err != nil {
 		return err
@@ -527,7 +527,7 @@ func handleMessage(msg *types.InboundMessage, chatType string, plugin *Plugin) {
 }
 
 // generateAndSendReply 生成并发送回复
-func generateAndSendReply(msg *types.InboundMessage, result message.ExtractResult, chatType string, plugin *Plugin) {
+func generateAndSendReply(msg *types.InboundMessage, result types.ExtractResult, chatType string, plugin *Plugin) {
 	// 获取成员管理
 	mem := plugin.GetMember()
 

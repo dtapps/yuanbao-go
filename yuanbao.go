@@ -2,7 +2,6 @@ package yuanbao
 
 import (
 	"github.com/dtapps/yuanbao-go/account"
-	"github.com/dtapps/yuanbao-go/config"
 	"github.com/dtapps/yuanbao-go/member"
 	"github.com/dtapps/yuanbao-go/plugin"
 	"github.com/dtapps/yuanbao-go/types"
@@ -14,7 +13,7 @@ type Client struct {
 }
 
 // NewClient 创建新客户端
-func NewClient(accountId string, cfg *config.Config) (*Client, error) {
+func NewClient(accountId string, cfg *types.Config) (*Client, error) {
 	// 解析账号
 	acc := account.GetManager().ResolveAccount(cfg, accountId)
 

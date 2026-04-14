@@ -66,12 +66,12 @@ func GetOperationSystem() string {
 
 // Client HTTP客户端
 type Client struct {
-	account *account.Account
+	account *types.Account
 	log     *logger.Logger
 }
 
 // NewClient 创建HTTP客户端
-func NewClient(acc *account.Account) *Client {
+func NewClient(acc *types.Account) *Client {
 	return &Client{
 		account: acc,
 		log:     logger.New("http"),

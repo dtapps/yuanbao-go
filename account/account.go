@@ -4,40 +4,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dtapps/yuanbao-go/config"
 	"github.com/dtapps/yuanbao-go/logger"
 	"github.com/dtapps/yuanbao-go/types"
 )
 
-// Account 账号信息
-type Account struct {
-	AccountID              string
-	Name                   string
-	Enabled                bool
-	Configured             bool
-	AppKey                 string
-	AppSecret              string
-	BotID                  string
-	Token                  string
-	ApiDomain              string
-	WsGatewayUrl           string
-	WsMaxReconnectAttempts int
-	OverflowPolicy         string
-	ReplyToMode            string
-	MediaMaxMb             int
-	MaxChars               int
-	HistoryLimit           int
-	DisableBlockStreaming  bool
-	RequireMention         bool
-	FallbackReply          string
-	MarkdownHintEnabled    bool
-	Config                 *config.YuanbaoConfig
-}
-
 // Manager 账号管理器
 type Manager struct {
 	mu       sync.RWMutex
-	accounts map[string]*Account
+	accounts map[string]*types.Account
 	botIds   map[string]string // accountId -> botId
 	log      *logger.Logger
 }
@@ -59,18 +33,18 @@ func GetManager() *Manager {
 // NewManager 创建账号管理器
 func NewManager() *Manager {
 	return &Manager{
-		accounts: make(map[string]*Account),
+		accounts: make(map[string]*types.Account),
 		botIds:   make(map[string]string),
 		log:      logger.New("account"),
 	}
 }
 
 // ResolveAccount 解析账号
-func (m *Manager) ResolveAccount(cfg *config.Config, accountId string) *Account {
+func (m *Manager) ResolveAccount(cfg *types.Config, accountId string) *types.Account {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	account := &Account{
+	account := &types.Account{
 		AccountID: accountId,
 	}
 
@@ -167,14 +141,14 @@ func (m *Manager) GetBotId(accountId string) string {
 }
 
 // GetAccount 获取账号
-func (m *Manager) GetAccount(accountId string) *Account {
+func (m *Manager) GetAccount(accountId string) *types.Account {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.accounts[accountId]
 }
 
 // SetAccount 设置账号
-func (m *Manager) SetAccount(accountId string, account *Account) {
+func (m *Manager) SetAccount(accountId string, account *types.Account) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.accounts[accountId] = account
@@ -189,11 +163,11 @@ func (m *Manager) DeleteAccount(accountId string) {
 }
 
 // ListAccounts 列出所有账号
-func (m *Manager) ListAccounts() []*Account {
+func (m *Manager) ListAccounts() []*types.Account {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	accounts := make([]*Account, 0, len(m.accounts))
+	accounts := make([]*types.Account, 0, len(m.accounts))
 	for _, account := range m.accounts {
 		accounts = append(accounts, account)
 	}
