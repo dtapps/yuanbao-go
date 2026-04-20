@@ -67,7 +67,7 @@ func (c *WsClient) sendHeartbeatMessage() {
 		return
 	}
 
-	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+	if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
 		c.log.Error("发送心跳消息失败", logger.F("error", err.Error()))
 		return
 	}
