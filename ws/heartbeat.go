@@ -10,6 +10,8 @@ import (
 
 // startHeartbeat 启动心跳
 func (c *WsClient) startHeartbeat() {
+	c.log.Info("启动心跳定时器")
+
 	c.stopHeartbeat()
 
 	c.mu.Lock()

@@ -1,7 +1,7 @@
 package types
 
 const (
-	Version = "1.0.3"
+	Version = "1.0.4"
 )
 
 // OnReadyData 连接就绪

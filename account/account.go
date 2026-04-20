@@ -121,7 +121,7 @@ func (m *Manager) ResolveAccount(cfg *types.Config, accountID string) *types.Acc
 		account.BotID = botId
 	}
 
-	m.log.Debug("解析账号",
+	m.log.Info("解析账号",
 		logger.F("accountID", accountID),
 		logger.F("configured", account.Configured),
 	)

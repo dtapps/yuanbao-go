@@ -4,10 +4,8 @@ import "time"
 
 const (
 	// 默认的 API 端点
-	DefaultWSEndpoint = "wss://bot-wss.yuanbao.tencent.com/wss/connection"
-	DefaultWSOrigin   = "https://yuanbao.tencent.com"
-
-	// Token 端点
+	DefaultWSEndpoint    = "wss://bot-wss.yuanbao.tencent.com/wss/connection"
+	DefaultWSOrigin      = "https://yuanbao.tencent.com"
 	DefaultTokenEndpoint = "https://bot.yuanbao.tencent.com/api/v5/robotLogic/sign-token"
 
 	// TokenExpireDuration token 过期时间（秒）

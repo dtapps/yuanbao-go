@@ -84,7 +84,7 @@ func (c *WsClient) handleMessage(data []byte) {
 			return
 		}
 	default:
-		c.log.Debug("未处理的cmdType",
+		c.log.Warn("未处理的cmdType",
 			logger.F("cmd", connMsg.Head.Cmd),
 			logger.F("cmdType", connMsg.Head.CmdType),
 		)
@@ -116,16 +116,6 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 			logger.F("code", code),
 		)
 
-		if authBind != nil && c.shouldRefreshToken(int(code)) {
-			// 刷新token并重连
-			c.mu.Lock()
-			c.state = types.ConnectionStateReconnecting.String()
-			c.mu.Unlock()
-
-			// go c.refreshTokenAndReconnect()
-			return
-		}
-
 		c.close()
 		if c.callback != nil {
 			c.callback.OnError(fmt.Errorf("auth failed: status=%d, code=%d", status, code))
@@ -149,7 +139,6 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 			ConnectID: c.connectID,
 			Timestamp: time.Now().Unix(),
 		}
-		result.Timestamp = int64(authBind.Timestamp)
 		c.callback.OnReady(result)
 		c.callback.OnStateChange(types.ConnectionStateConnected.String())
 	}
