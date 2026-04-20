@@ -50,9 +50,6 @@ func ToInboundMessage(m *bizProto.InboundMessagePush) *types.InboundMessage {
 		RawMessage: rawMessage, // 原始数据
 	}
 
-	fmt.Printf("MsgBody:%+v\n", m.MsgBody)
-	fmt.Printf("GetMsgBody:%+v\n", m.GetMsgBody())
-
 	// 处理消息内容
 	for _, item := range m.MsgBody {
 		if item.MsgType == "TIMTextElem" {
@@ -146,7 +143,7 @@ type BuildPingRequestMessageParams struct {
 }
 
 // BuildPingRequestMessage 构建 ping 请求消息
-func BuildPingRequestMessage(params BuildPingRequestMessageParams) ([]byte, error) {
+func BuildPingRequestMessage(params BuildPingRequestMessageParams) (string, []byte, error) {
 
 	// 业务数据
 	pingReq := &connProto.PingReq{}
@@ -154,7 +151,7 @@ func BuildPingRequestMessage(params BuildPingRequestMessageParams) ([]byte, erro
 	// Protobuf 编码
 	reqData, err := proto.Marshal(pingReq)
 	if err != nil {
-		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
 	}
 
 	// 公共数据
@@ -172,10 +169,10 @@ func BuildPingRequestMessage(params BuildPingRequestMessageParams) ([]byte, erro
 	// Protobuf 编码
 	data, err := proto.Marshal(connMsg)
 	if err != nil {
-		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
 	}
 
-	return data, nil
+	return connMsg.Head.MsgId, data, nil
 }
 
 type BuildAuthBindRequestMessageParams struct {
@@ -188,7 +185,7 @@ type BuildAuthBindRequestMessageParams struct {
 }
 
 // BuildAuthBindRequestMessage 构建 auth-bind 请求消息
-func BuildAuthBindRequestMessage(params BuildAuthBindRequestMessageParams) ([]byte, error) {
+func BuildAuthBindRequestMessage(params BuildAuthBindRequestMessageParams) (string, []byte, error) {
 
 	// 业务数据
 	authBindReq := &connProto.AuthBindReq{
@@ -212,7 +209,7 @@ func BuildAuthBindRequestMessage(params BuildAuthBindRequestMessageParams) ([]by
 	// Protobuf 编码
 	reqData, err := proto.Marshal(authBindReq)
 	if err != nil {
-		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
 	}
 
 	// 公共数据
@@ -230,10 +227,10 @@ func BuildAuthBindRequestMessage(params BuildAuthBindRequestMessageParams) ([]by
 	// Protobuf 编码
 	data, err := proto.Marshal(connMsg)
 	if err != nil {
-		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
 	}
 
-	return data, nil
+	return connMsg.Head.MsgId, data, nil
 }
 
 // ParseInboundMessageMessage 解析 inbound_message 消息

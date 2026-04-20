@@ -101,6 +101,9 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 		c.log.Error("解析消息失败", logger.F("error", err))
 		return
 	}
+	c.log.Debug("认证绑定响应",
+		logger.F("authBind", authBind),
+	)
 
 	// 状态码 (status)，通常用于表示连接层是否成功
 	status := connMsg.Head.Status
@@ -152,16 +155,19 @@ func (c *WsClient) handleResponseTypePing(connMsg *connProto.ConnMsg) {
 	c.mu.Unlock()
 
 	// 解析 ping 消息
-	_, err := message.ParsePingMessage(connMsg.Data)
+	ping, err := message.ParsePingMessage(connMsg.Data)
 	if err != nil {
 		c.log.Error("解析消息失败", logger.F("error", err))
 		return
 	}
+	c.log.Debug("Ping响应",
+		logger.F("ping", ping),
+	)
 
 	c.lastHeartbeatAt = time.Now().UnixMilli()
 }
 
-// handleResponseTypeInboundMessage 处理业务响应
+// handleResponseTypeInboundMessage 处理消息推送
 func (c *WsClient) handleResponseTypeInboundMessage(connMsg *connProto.ConnMsg) {
 
 	// 解析 inbound_message 消息
@@ -170,8 +176,7 @@ func (c *WsClient) handleResponseTypeInboundMessage(connMsg *connProto.ConnMsg) 
 		c.log.Error("解析 inbound_message 消息失败", logger.F("error", err))
 		return
 	}
-
-	c.log.Debug("解析 inbound_message 消息成功",
+	c.log.Debug("消息推送",
 		logger.F("inboundMessage", inboundMessage),
 	)
 

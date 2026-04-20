@@ -61,17 +61,21 @@ func (c *WsClient) sendHeartbeatMessage() {
 	params := message.BuildPingRequestMessageParams{
 		SeqNo: c.generateNextSeqNo(),
 	}
-	data, err := message.BuildPingRequestMessage(params)
+	messageID, data, err := message.BuildPingRequestMessage(params)
 	if err != nil {
-		c.log.Error("发送心跳消息失败", logger.F("error", err.Error()))
+		c.log.Error("构建心跳消息失败", logger.F("error", err.Error()))
 		return
 	}
 
 	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		c.log.Error("发送心跳消息失败", logger.F("error", err.Error()))
+		return
 	}
 
-	c.log.Debug("发送心跳消息成功", logger.F("data", string(data)))
+	c.log.Info("发送心跳消息成功",
+		logger.F("messageID", messageID),
+		logger.F("data", string(data)),
+	)
 
 	c.mu.Lock()
 	c.heartbeatTimer = time.AfterFunc(c.heartbeatInterval, func() {
