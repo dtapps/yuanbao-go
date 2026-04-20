@@ -1,0 +1,13 @@
+# golangci-lint v2 配置文件
+# 使用官方标准 linter 集合
+# 包含：errcheck, gosimple, govet, ineffassign, staticcheck, unused
+version: "2"
+
+# linters 配置 linter 的启用和禁用
+# default: standard 表示使用官方标准集合
+linters:
+  default: standard
+  disable:
+    # unused 检查未使用的代码（变量、函数、字段等）
+    # 禁用原因：允许保留预留字段或未来会用到的代码
+    - unused

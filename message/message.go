@@ -3,404 +3,405 @@ package message
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strings"
 
 	"github.com/dtapps/yuanbao-go/types"
+	bizProto "github.com/dtapps/yuanbao-go/wsproto/biz"
+	connProto "github.com/dtapps/yuanbao-go/wsproto/conn"
+	"github.com/tidwall/gjson"
+	"google.golang.org/protobuf/proto"
 )
 
-// ExtractTextFromMsgBody 从消息体提取文本
-func ExtractTextFromMsgBody(msgBody []types.MsgBodyElement) types.ExtractResult {
-	result := types.ExtractResult{
-		Medias:   make([]types.MediaInfo, 0),
-		Mentions: make([]types.MentionInfo, 0),
+// InferChatType 推断聊天类型
+func InferChatType(msg *bizProto.InboundMessagePush) types.ChatType {
+	if msg.GroupCode != "" {
+		return types.ChatTypeGroup
 	}
 
-	var textParts []string
-	var atBotUserId string
+	callbackCmd := msg.CallbackCommand
+	if callbackCmd == "Group.CallbackAfterRecallMsg" || callbackCmd == "Group.CallbackAfterSendMsg" {
+		return types.ChatTypeGroup
+	}
 
-	for _, elem := range msgBody {
-		switch elem.MsgType {
-		case "TIMTextElem":
-			if elem.MsgContent.Text != "" {
-				textParts = append(textParts, elem.MsgContent.Text)
-			}
+	return types.ChatTypeC2C
+}
 
-		case "TIMCustomElem":
-			// 解析自定义消息
-			data := elem.MsgContent.Data
-			if data != "" {
-				var customData map[string]any
-				if err := json.Unmarshal([]byte(data), &customData); err == nil {
-					// 检查是否是@消息
-					if elemType, ok := customData["elem_type"].(float64); ok && elemType == 1002 {
-						if text, ok := customData["text"].(string); ok {
-							textParts = append(textParts, text)
-						}
-						if userId, ok := customData["user_id"].(string); ok {
-							atBotUserId = userId
-						}
-					}
-				}
-			}
+// ToInboundMessage WsMessageMsg 转换为 InboundMessage
+func ToInboundMessage(m *bizProto.InboundMessagePush) *types.InboundMessage {
 
-		case "TIMImageElem":
-			media := types.MediaInfo{
-				Type: "image",
-				URL:  elem.MsgContent.URL,
-				UUID: elem.MsgContent.UUID,
-			}
-			result.Medias = append(result.Medias, media)
+	// 注意：
+	//	C2C 中 ToAccount 为小龙虾 ID，如果设置 RecipientID 为 ToAccount 就报错
 
-		case "TIMFileElem":
-			media := types.MediaInfo{
-				Type:     "file",
-				UUID:     elem.MsgContent.UUID,
-				FileName: elem.MsgContent.FileName,
-				Size:     elem.MsgContent.FileSize,
-			}
-			result.Medias = append(result.Medias, media)
+	// 结构体转换为[]byte
+	rawMessage, _ := json.Marshal(m)
 
-		case "TIMVideoFileElem":
-			media := types.MediaInfo{
-				Type: "video",
-				UUID: elem.MsgContent.UUID,
-			}
-			result.Medias = append(result.Medias, media)
+	inbound := &types.InboundMessage{
+		MessageID: m.MsgId, // 消息ID
 
-		case "TIMSoundElem":
-			media := types.MediaInfo{
-				Type: "sound",
-				UUID: elem.MsgContent.UUID,
+		SenderID:   m.FromAccount,    // 发送者ID
+		SenderName: m.SenderNickname, // 发送者名称
+		Timestamp:  int64(m.MsgTime), // 发送时间戳
+
+		GroupID:   m.GroupId,   // 群ID
+		GroupCode: m.GroupCode, // 群码
+		GroupName: m.GroupName, // 群名称
+
+		RecipientID: m.FromAccount, // 接收者ID
+
+		RawMessage: rawMessage, // 原始数据
+	}
+
+	fmt.Printf("MsgBody:%+v\n", m.MsgBody)
+	fmt.Printf("GetMsgBody:%+v\n", m.GetMsgBody())
+
+	// 处理消息内容
+	for _, item := range m.MsgBody {
+		if item.MsgType == "TIMTextElem" {
+			inbound.Content = append(inbound.Content, types.MessageSegment{
+				Type: "text",               // 消息类型 text | image | file
+				Text: item.MsgContent.Text, // 文本内容
+			})
+		}
+		if item.MsgType == "TIMCustomElem" {
+			elemType := gjson.Get(item.MsgContent.Data, "elem_type").Int()
+			if elemType == 1002 {
+				// 被 @ 了
+				inbound.AtList = append(inbound.AtList, types.AtInfo{
+					UserID:   gjson.Get(item.MsgContent.Data, "user_id").String(),   // 用户ID
+					UserName: gjson.Get(item.MsgContent.Data, "user_name").String(), // 用户名称
+				})
 			}
-			result.Medias = append(result.Medias, media)
+		}
+		if item.MsgType == "TIMImageElem" {
+			for _, image := range item.MsgContent.ImageInfoArray {
+				inbound.Content = append(inbound.Content, types.MessageSegment{
+					Type:     "image",           // 消息类型 text | image | file
+					Url:      image.Url,         // 远程资源链接
+					FileSize: int64(image.Size), // 文件大小
+				})
+			}
+		}
+		if item.MsgType == "TIMFileElem" {
+			inbound.Content = append(inbound.Content, types.MessageSegment{
+				Type:     "file",                          // 消息类型 text | image | file
+				Url:      item.MsgContent.Url,             // 远程资源链接
+				FileName: item.MsgContent.FileName,        // 文件名
+				FileSize: int64(item.MsgContent.FileSize), // 文件大小
+			})
+		}
+		if item.MsgType == "TIMFaceElem" {
+			// 表情消息，暂不处理
+			_ = item.MsgType // 避免空分支警告
 		}
 	}
 
-	result.RawBody = strings.Join(textParts, "")
-	result.Text = strings.TrimSpace(result.RawBody)
-	result.IsAtBot = atBotUserId != ""
-	result.BotUsername = atBotUserId
-
-	return result
+	return inbound
 }
 
-// BuildTextMsgBody 构建文本消息体
-func BuildTextMsgBody(text string) []types.MsgBodyElement {
-	return []types.MsgBodyElement{
-		{
-			MsgType: "TIMTextElem",
-			MsgContent: types.MsgContent{
-				Text: text,
-			},
+type BuildPushAckMessageParams struct {
+	SeqNo uint32
+}
+
+// BuildPushAckMessage 构建 PushAck 消息
+func BuildPushAckMessage(head *connProto.Head, params BuildPushAckMessageParams) ([]byte, error) {
+
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypePushAck),
+			Cmd:     head.Cmd,
+			SeqNo:   params.SeqNo,
+			MsgId:   head.MsgId,
+			Module:  head.Module,
 		},
 	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	return data, nil
 }
 
-// BuildImageMsgBody 构建图片消息体
-func BuildImageMsgBody(url, uuid string, size uint32) []types.MsgBodyElement {
-	return []types.MsgBodyElement{
-		{
-			MsgType: "TIMImageElem",
-			MsgContent: types.MsgContent{
-				UUID:     uuid,
-				URL:      url,
-				FileSize: size,
-			},
+// ParsePingMessage 解析 ping 消息
+func ParsePingMessage(data []byte) (*connProto.PingRsp, error) {
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf("空数据")
+	}
+
+	ping := &connProto.PingRsp{}
+
+	// 解析数据
+	if err := UnmarshalAny(data, ping); err != nil {
+		return nil, err
+	}
+
+	return ping, nil
+}
+
+type BuildPingRequestMessageParams struct {
+	SeqNo uint32
+}
+
+// BuildPingRequestMessage 构建 ping 请求消息
+func BuildPingRequestMessage(params BuildPingRequestMessageParams) ([]byte, error) {
+
+	// 业务数据
+	pingReq := &connProto.PingReq{}
+
+	// Protobuf 编码
+	reqData, err := proto.Marshal(pingReq)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypeRequest),
+			Cmd:     string(types.CmdPing),
+			SeqNo:   params.SeqNo,
+			MsgId:   GenerateMsgID(),
+			Module:  string(types.ModuleConnAccess),
+		},
+		Data: reqData,
+	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	return data, nil
+}
+
+type BuildAuthBindRequestMessageParams struct {
+	SeqNo    uint32
+	BizID    string
+	UID      string
+	Source   string
+	Token    string
+	RouteEnv string
+}
+
+// BuildAuthBindRequestMessage 构建 auth-bind 请求消息
+func BuildAuthBindRequestMessage(params BuildAuthBindRequestMessageParams) ([]byte, error) {
+
+	// 业务数据
+	authBindReq := &connProto.AuthBindReq{
+		BizId: params.BizID,
+		AuthInfo: &connProto.AuthInfo{
+			Uid:    params.UID,
+			Source: params.Source,
+			Token:  params.Token,
+		},
+		DeviceInfo: &connProto.DeviceInfo{
+			AppVersion:         "1.0.0",
+			AppOperationSystem: "Go",
+			InstanceId:         types.InstanceId,
+			BotVersion:         "1.0.0",
 		},
 	}
-}
-
-// BuildFileMsgBody 构建文件消息体
-func BuildFileMsgBody(url, uuid, fileName string, size uint32) []types.MsgBodyElement {
-	return []types.MsgBodyElement{
-		{
-			MsgType: "TIMFileElem",
-			MsgContent: types.MsgContent{
-				UUID:     uuid,
-				URL:      url,
-				FileName: fileName,
-				FileSize: size,
-			},
-		},
+	if params.RouteEnv != "" {
+		authBindReq.EnvName = params.RouteEnv
 	}
-}
 
-// BuildCustomMsgBody 构建自定义消息体
-func BuildCustomMsgBody(data string) []types.MsgBodyElement {
-	return []types.MsgBodyElement{
-		{
-			MsgType: "TIMCustomElem",
-			MsgContent: types.MsgContent{
-				Data: data,
-			},
-		},
+	// Protobuf 编码
+	reqData, err := proto.Marshal(authBindReq)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
 	}
-}
 
-// BuildAtUserMsgBody 构建@用户消息体
-func BuildAtUserMsgBody(userId, nickName string) []types.MsgBodyElement {
-	data, _ := json.Marshal(map[string]any{
-		"elem_type": 1002,
-		"text":      "@" + nickName,
-		"user_id":   userId,
-	})
-
-	return []types.MsgBodyElement{
-		{
-			MsgType: "TIMCustomElem",
-			MsgContent: types.MsgContent{
-				Data: string(data),
-			},
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypeRequest),
+			Cmd:     string(types.CmdAuthBind),
+			SeqNo:   params.SeqNo,
+			MsgId:   GenerateMsgID(),
+			Module:  string(types.ModuleConnAccess),
 		},
+		Data: reqData,
 	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	return data, nil
 }
 
-// PrepareOutboundContent 准备发送内容
-func PrepareOutboundContent(text string) []OutboundItem {
-	items := make([]OutboundItem, 0)
+// ParseInboundMessageMessage 解析 inbound_message 消息
+func ParseInboundMessageMessage(data []byte) (*bizProto.InboundMessagePush, error) {
 
+	if len(data) == 0 {
+		return nil, fmt.Errorf("空数据")
+	}
+
+	inbound := &bizProto.InboundMessagePush{}
+
+	// 解析数据
+	if err := UnmarshalAny(data, inbound); err != nil {
+		return nil, err
+	}
+
+	return inbound, nil
+}
+
+type BuildInboundMessageC2CMessageParams struct {
+	SeqNo       uint32
+	ToAccount   string
+	FromAccount string
+	MsgSeq      uint64
+	Text        string
+}
+
+// BuildInboundMessageC2CMessage 构建 inbound_message C2C 消息
+func BuildInboundMessageC2CMessage(params BuildInboundMessageC2CMessageParams) (string, []byte, error) {
+
+	// 业务数据
+	c2cMessageReq := &bizProto.SendC2CMessageReq{
+		MsgId:       GenerateMsgID(),
+		ToAccount:   params.ToAccount,
+		FromAccount: params.FromAccount,
+		MsgRandom:   GenerateMsgRandom(),
+		MsgBody:     PrepareMsgBodyElement(params.Text, nil),
+		MsgSeq:      params.MsgSeq,
+	}
+
+	// Protobuf 编码
+	reqData, err := proto.Marshal(c2cMessageReq)
+	if err != nil {
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypeRequest),
+			Cmd:     string(types.BizCmdSendC2CMessage),
+			SeqNo:   params.SeqNo,
+			MsgId:   c2cMessageReq.MsgId,
+			Module:  string(types.ModuleYuanbaoOpenClawProxy),
+		},
+		Data: reqData,
+	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	return c2cMessageReq.MsgId, data, nil
+}
+
+type BuildInboundMessageGroupMessageParams struct {
+	SeqNo       uint32
+	GroupCode   string
+	FromAccount string
+	RefMsgID    string
+	TraceID     string
+	Text        string
+	AtList      []types.AtInfo
+}
+
+// BuildInboundMessageGroupMessage 构建 inbound_message Group 消息
+func BuildInboundMessageGroupMessage(params BuildInboundMessageGroupMessageParams) (string, []byte, error) {
+
+	// 业务数据
+	groupMessageReq := &bizProto.SendGroupMessageReq{
+		MsgId:       GenerateMsgID(),
+		GroupCode:   params.GroupCode,
+		FromAccount: params.FromAccount,
+		Random:      GenerateRandom(),
+		RefMsgId:    params.RefMsgID,
+		MsgBody:     PrepareMsgBodyElement(params.Text, params.AtList),
+	}
+
+	if groupMessageReq.LogExt != nil {
+		groupMessageReq.LogExt = &bizProto.LogInfoExt{
+			TraceId: params.TraceID,
+		}
+	}
+
+	// Protobuf 编码
+	reqData, err := proto.Marshal(groupMessageReq)
+	if err != nil {
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypeRequest),
+			Cmd:     string(types.BizCmdSendGroupMessage),
+			SeqNo:   params.SeqNo,
+			MsgId:   groupMessageReq.MsgId,
+			Module:  string(types.ModuleYuanbaoOpenClawProxy),
+		},
+		Data: reqData,
+	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return "", nil, fmt.Errorf("protobuf 编码失败: %w", err)
+	}
+
+	return groupMessageReq.MsgId, data, nil
+}
+
+// PrepareMsgBodyElement 准备消息体元素
+func PrepareMsgBodyElement(text string, atList []types.AtInfo) []*bizProto.MsgBodyElement {
+
+	items := make([]*bizProto.MsgBodyElement, 0)
 	if text == "" {
 		return items
 	}
 
-	// 处理@提及
-	atRegex := regexp.MustCompile(`(?:\s|^)@(\S+?)(?:\s|$)`)
-	matches := atRegex.FindAllStringSubmatchIndex(text, -1)
-
-	if len(matches) == 0 {
-		items = append(items, OutboundItem{
-			Type: "text",
-			Data: map[string]any{
-				"text": text,
-			},
-		})
-		return items
+	// 添加主文本
+	if text != "" {
+		items = append(items, createTextElement(text))
 	}
 
-	lastIndex := 0
-	for _, match := range matches {
-		// 添加匹配前的文本
-		if match[0] > lastIndex {
-			before := strings.TrimSpace(text[lastIndex:match[0]])
-			if before != "" {
-				items = append(items, OutboundItem{
-					Type: "text",
-					Data: map[string]any{
-						"text": before,
-					},
-				})
-			}
-		}
-
-		// 添加@提及
-		nickName := text[match[2]:match[3]]
-		items = append(items, OutboundItem{
-			Type: "custom",
-			Data: map[string]any{
-				"elem_type": 1002,
-				"text":      "@" + nickName,
-				"user_id":   nickName, // 实际使用中需要解析为真实userId
-			},
-		})
-
-		lastIndex = match[1]
-	}
-
-	// 添加剩余文本
-	if lastIndex < len(text) {
-		remaining := strings.TrimSpace(text[lastIndex:])
-		if remaining != "" {
-			items = append(items, OutboundItem{
-				Type: "text",
-				Data: map[string]any{
-					"text": remaining,
-				},
-			})
-		}
+	// 添加 @ 列表
+	for _, at := range atList {
+		items = append(items, createAtElement(at.UserID, at.UserName))
 	}
 
 	return items
 }
 
-// OutboundItem 出站消息项
-type OutboundItem struct {
-	Type string
-	Data map[string]any
+func createTextElement(text string) *bizProto.MsgBodyElement {
+	return &bizProto.MsgBodyElement{
+		MsgType: "TIMTextElem",
+		MsgContent: &bizProto.MsgContent{
+			Text: text,
+		},
+	}
 }
 
-// BuildOutboundMsgBody 构建出站消息体
-func BuildOutboundMsgBody(items []OutboundItem) []types.MsgBodyElement {
-	msgBody := make([]types.MsgBodyElement, 0)
-
-	for _, item := range items {
-		switch item.Type {
-		case "text":
-			if text, ok := item.Data["text"].(string); ok && text != "" {
-				msgBody = append(msgBody, BuildTextMsgBody(text)...)
-			}
-
-		case "custom":
-			if data, ok := item.Data["data"].(string); ok {
-				msgBody = append(msgBody, BuildCustomMsgBody(data)...)
-			} else if jsonData, err := json.Marshal(item.Data); err == nil {
-				msgBody = append(msgBody, BuildCustomMsgBody(string(jsonData))...)
-			}
-
-		case "image":
-			url := getString(item.Data, "url")
-			uuid := getString(item.Data, "uuid")
-			size := getUint32(item.Data, "size")
-			msgBody = append(msgBody, BuildImageMsgBody(url, uuid, size)...)
-
-		case "file":
-			url := getString(item.Data, "url")
-			uuid := getString(item.Data, "uuid")
-			fileName := getString(item.Data, "fileName")
-			size := getUint32(item.Data, "size")
-			msgBody = append(msgBody, BuildFileMsgBody(url, uuid, fileName, size)...)
-		}
+func createAtElement(userID string, nickname string) *bizProto.MsgBodyElement {
+	internalData := map[string]any{
+		"elem_type": 1002,
+		"text":      "@" + nickname,
+		"user_id":   userID,
+		"content":   "",
 	}
 
-	return msgBody
+	dataBytes, _ := json.Marshal(internalData)
+
+	return &bizProto.MsgBodyElement{
+		MsgType: "TIMCustomElem",
+		MsgContent: &bizProto.MsgContent{
+			Data: string(dataBytes),
+			Desc: "@" + nickname,
+		},
+	}
 }
-
-// BuildOutboundMsgBodyFromText 从文本构建出站消息体
-func BuildOutboundMsgBodyFromText(text string) []types.MsgBodyElement {
-	items := PrepareOutboundContent(text)
-	return BuildOutboundMsgBody(items)
-}
-
-// QuoteInfo 引用信息
-type QuoteInfo struct {
-	ID             string
-	SenderID       string
-	SenderNickname string
-	Desc           string
-}
-
-// ParseQuoteFromCloudCustomData 解析引用信息
-func ParseQuoteFromCloudCustomData(cloudCustomData string) *QuoteInfo {
-	if cloudCustomData == "" {
-		return nil
-	}
-
-	var data map[string]any
-	if err := json.Unmarshal([]byte(cloudCustomData), &data); err != nil {
-		return nil
-	}
-
-	// 检查是否有引用数据
-	quoteData, ok := data["Quote"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	info := &QuoteInfo{}
-
-	if id, ok := quoteData["MsgID"].(string); ok {
-		info.ID = id
-	}
-	if senderId, ok := quoteData["UserID"].(string); ok {
-		info.SenderID = senderId
-	}
-	if senderNick, ok := quoteData["NickName"].(string); ok {
-		info.SenderNickname = senderNick
-	}
-	if desc, ok := quoteData["Desc"].(string); ok {
-		info.Desc = desc
-	}
-
-	return info
-}
-
-// FormatQuoteContext 格式化引用上下文
-func FormatQuoteContext(info *QuoteInfo) string {
-	if info == nil {
-		return ""
-	}
-
-	desc := info.Desc
-	if desc == "" {
-		desc = "[引用消息]"
-	}
-
-	sender := info.SenderNickname
-	if sender == "" {
-		sender = info.SenderID
-	}
-
-	return fmt.Sprintf("> %s\n> — @%s\n\n", desc, sender)
-}
-
-// SendResult 发送结果
-type SendResult struct {
-	Ok        bool
-	MessageID string
-	Error     error
-}
-
-// InferChatType 推断聊天类型
-func InferChatType(msg *types.InboundMessage) string {
-	if msg.GroupCode != "" {
-		return "group"
-	}
-
-	callbackCmd := msg.CallbackCommand
-	if callbackCmd == "Group.CallbackAfterRecallMsg" || callbackCmd == "Group.CallbackAfterSendMsg" {
-		return "group"
-	}
-
-	return "c2c"
-}
-
-// HasValidMsgFields 检查消息是否有有效字段
-func HasValidMsgFields(msg *types.InboundMessage) bool {
-	return msg.CallbackCommand != "" || msg.FromAccount != "" || len(msg.MsgBody) > 0
-}
-
-// 辅助函数
-
-func getString(data map[string]any, key string) string {
-	if v, ok := data[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func getUint32(data map[string]any, key string) uint32 {
-	if v, ok := data[key].(float64); ok {
-		return uint32(v)
-	}
-	return 0
-}
-
-// NormalizeMarkdownText 规范化Markdown文本
-func NormalizeMarkdownText(text string) string {
-	// 移除首尾的代码块标记
-	for {
-		if strings.HasPrefix(text, "```") && strings.HasSuffix(text, "```") {
-			text = strings.TrimPrefix(text, "```")
-			text = strings.TrimSuffix(text, "```")
-			text = strings.Trim(text, "\n")
-			continue
-		}
-		break
-	}
-
-	return text
-}
-
-// StripOuterMarkdownFence 移除外层Markdown代码块
-func StripOuterMarkdownFence(text string) string {
-	return NormalizeMarkdownText(text)
-}
-
-// Constants 常量
-const (
-	MarkdownHintText = "请直接输出Markdown内容，不需要用代码块包裹"
-
-	OverflowNoticeText = "⚠️ 消息过长已截断，如需查看完整内容请单独发送"
-
-	FinalTextChunkLimit = 3000
-)

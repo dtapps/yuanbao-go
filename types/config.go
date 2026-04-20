@@ -2,10 +2,11 @@ package types
 
 // YuanbaoConfig 元宝配置结构
 type YuanbaoConfig struct {
-	Enabled                *bool  `json:"enabled,omitempty"`
-	AppKey                 string `json:"appKey,omitempty"`
-	AppSecret              string `json:"appSecret,omitempty"`
-	Token                  string `json:"token,omitempty"`
+	Enabled                *bool  `json:"enabled,omitempty"`                // 是否启用
+	AppID                  string `json:"appID,omitempty"`                  // 应用ID
+	AppSecret              string `json:"appSecret,omitempty"`              // 应用密钥
+	TokenEndpoint          string `json:"tokenEndpoint,omitempty"`          // Token 端点
+	WSEndpoint             string `json:"wsEndpoint,omitempty"`             // WebSocket 端点
 	OverflowPolicy         string `json:"overflowPolicy,omitempty"`         // "stop" | "split"
 	ReplyToMode            string `json:"replyToMode,omitempty"`            // "off" | "first" | "all"
 	OutboundQueueStrategy  string `json:"outboundQueueStrategy,omitempty"`  // "immediate" | "merge-text"
@@ -18,8 +19,6 @@ type YuanbaoConfig struct {
 	RequireMention         *bool  `json:"requireMention,omitempty"`         // 群聊需要@机器人
 	FallbackReply          string `json:"fallbackReply,omitempty"`          // 兜底回复文案
 	MarkdownHintEnabled    *bool  `json:"markdownHintEnabled,omitempty"`    // 注入Markdown格式指令
-	ApiDomain              string `json:"apiDomain,omitempty"`              // API域名
-	WsUrl                  string `json:"wsUrl,omitempty"`                  // WebSocket网关URL
 	WsMaxReconnectAttempts int    `json:"wsMaxReconnectAttempts,omitempty"` // 最大重连次数
 	RouteEnv               string `json:"routeEnv,omitempty"`               // 路由环境
 }

@@ -1,0 +1,12 @@
+version: 2
+
+updates:
+
+  # Go dependencies (entire repo)
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "go"

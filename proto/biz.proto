@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+// 对应 Biz 业务层协议
+package yuanbao_biz;
+
+// 生成的 Go 代码存放位置
+option go_package = "yuanbao-go/wsproto/biz";
+
+
+// 时间格式不统一，需要转换为 google.protobuf.Timestamp
+// import "google/protobuf/timestamp.proto";
+
+// 时间单位（秒/毫秒）混淆，需要转换为 google.protobuf.Duration.Duration
+// import "google/protobuf/duration.proto";
+
+// 静态语言缺乏灵活性
+// import "google/protobuf/any.proto";
+
+// 全量覆盖导致的脏写
+// import "google/protobuf/field_mask.proto";
+
+// 静态定义信息不足
+// import "google/protobuf/descriptor.proto";
+
+
+// 消息序号信息，用于标识消息的序列号和消息ID
+message ImMsgSeq {
+    uint64 msgSeq = 1;     // 消息序列号
+    string msgId = 2;      // 消息ID
+}
+
+// 图片信息，包含图片的元数据
+message ImImageInfoArray {
+    uint32 type = 1;    // 图片类型
+    uint32 size = 2;    // 图片大小
+    uint32 width = 3; // 图片宽度
+    uint32 height = 4;  // 图片高度
+    string url = 5;     // 图片URL
+}
+
+// 消息具体内容，包含文本、图片、文件等多种消息类型
+message MsgContent {
+    string text = 1;                      // 文本内容
+    string uuid = 2;                       // 消息唯一标识
+    uint32 imageFormat = 3;              // 图片格式
+    string data = 4;                         // 数据内容
+    string desc = 5;                       // 描述信息
+    string ext = 6;                        // 扩展信息
+    string sound = 7;                        // 声音/语音信息
+    repeated ImImageInfoArray imageInfoArray = 8;  // 图片信息数组
+    uint32 index = 9;                        // 索引
+    string url = 10;                         // URL地址
+    uint32 fileSize = 11;                    // 文件大小
+    string fileName = 12;                  // 文件名称
+}
+
+// 消息体元素，包含消息类型和消息内容
+message MsgBodyElement {
+    string msgType = 1;        // 消息类型，如 "TIMTextElem", "TIMImageElem" 等
+    MsgContent msgContent = 2;    // 消息内容
+}
+
+// 日志扩展信息，用于传递追踪信息
+message LogInfoExt {
+    string traceId = 1;    // 追踪ID
+}
+
+// 枚举：消息类型，区分群消息和私聊消息
+enum EnumCLawMsgType {
+    CLAW_MSG_UNKNOWN = 0;  // 未知类型
+    CLAW_MSG_GROUP = 1;    // 群消息
+    CLAW_MSG_PRIVATE = 2;  // 私聊消息
+}
+
+// 发送C2C消息请求，用于向单个用户发送消息
+message SendC2CMessageReq {
+    string msgId = 1;                 // 消息ID
+    string toAccount = 2;             // 接收者账号
+    string fromAccount = 3;           // 发送者账号
+    uint32 msgRandom = 4;             // 消息随机数
+    repeated MsgBodyElement msgBody = 5; // 消息体列表
+    string groupCode = 6;             // 群号（私聊时使用）
+    uint64 msgSeq = 7;                // 消息序列号
+    LogInfoExt logExt = 8;            // 日志扩展信息
+}
+
+// 发送C2C消息响应
+message SendC2CMessageRsp {
+    int32 code = 1;     // 错误码
+    string message = 2;  // 错误信息
+}
+
+// 发送群消息请求，用于向群发送消息
+message SendGroupMessageReq {
+    string msgId = 1;                 // 消息ID
+    string groupCode = 2;             // 群号
+    string fromAccount = 3;           // 发送者账号
+    string toAccount = 4;             // 接收者账号（@成员时使用）
+    string random = 5;                // 随机数
+    repeated MsgBodyElement msgBody = 6; // 消息体列表
+    string refMsgId = 7;             // 引用消息ID
+    uint64 msgSeq = 8;                // 消息序列号
+    LogInfoExt logExt = 9;            // 日志扩展信息
+}
+
+// 发送群消息响应
+message SendGroupMessageRsp {
+    int32 code = 1;     // 错误码
+    string message = 2;  // 错误信息
+}
+
+// 进站消息推送结构
+message InboundMessagePush {
+    string callbackCommand = 1;   // 回调命令
+    string fromAccount = 2;     // 发送者账号
+    string toAccount = 3;       // 接收者账号
+    string senderNickname = 4;    // 发送者昵称
+    string groupId = 5;         // 群ID
+    string groupCode = 6;       // 群号
+    string groupName = 7;       // 群名称
+    uint32 msgSeq = 8;            // 消息序列号
+    uint32 msgRandom = 9;        // 消息随机数
+    uint32 msgTime = 10;         // 消息时间
+    string msgKey = 11;        // 消息Key
+    string msgId = 12;          // 消息ID
+    repeated MsgBodyElement msgBody = 13; // 消息体列表
+    string cloudCustomData = 14; // 云端自定义数据
+    uint32 eventTime = 15;      // 事件时间
+    string botOwnerId = 16;     // Bot拥有者ID
+    repeated ImMsgSeq recallMsgSeqList = 17;  // 撤回消息序列号列表
+    EnumCLawMsgType clawMsgType = 18; // 消息类型（群/私）
+    string privateFromGroupCode = 19;   // 私聊来源群号
+    LogInfoExt logExt = 20;   // 日志扩展信息
+}
+
+// 获取群成员列表请求
+message GetGroupMemberListReq {
+    string groupCode = 1; // 群号
+}
+
+// 获取群成员列表响应
+message GetGroupMemberListRsp {
+    int32 code = 1;                    // 错误码
+    string message = 2;                 // 错误信息
+    repeated Member memberList = 3;    // 成员列表
+}
+
+// 群成员信息
+message Member {
+    string userId = 1;    // 用户ID
+    string nickName = 2;  // 昵称
+    int32 userType = 3;   // 用户类型
+}
+
+// 查询群信息请求
+message QueryGroupInfoReq {
+    string groupCode = 1; // 群号
+}
+
+// 查询群信息响应
+message QueryGroupInfoRsp {
+    int32 code = 1;           // 错误码
+    string msg = 2;           // 错误信息
+    GroupInfo groupInfo = 3;  // 群信息
+}
+
+// 群信息
+message GroupInfo {
+    string groupName = 1;            // 群名称
+    string groupOwnerUserId = 2;      // 群主用户ID
+    string groupOwnerNickname = 3;   // 群主昵称
+    int32 groupSize = 4;            // 群成员数量
+}
+
+// 枚举：心跳状态
+enum EnumHeartbeat {
+    HEARTBEAT_UNKNOWN = 0;  // 未知状态
+    HEARTBEAT_RUNNING = 1;  // 运行中
+    HEARTBEAT_FINISH = 2;   // 已完成
+}
+
+// 发送私聊心跳请求，用于私聊场景下的心跳检测
+message SendPrivateHeartbeatReq {
+    string fromAccount = 1;     // 发送者账号
+    string toAccount = 2;      // 接收者账号
+    EnumHeartbeat heartbeat = 3; // 心跳状态
+}
+
+// 发送私聊心跳响应
+message SendPrivateHeartbeatRsp {
+    int32 code = 1; // 错误码
+    string msg = 2; // 错误信息
+}
+
+// 发送群心跳请求，用于群聊场景下的心跳检测
+message SendGroupHeartbeatReq {
+    string fromAccount = 1;      // 发送者账号
+    string toAccount = 2;       // 接收者账号
+    string groupCode = 3;       // 群号
+    int64 sendTime = 4;         // 发送时间
+    EnumHeartbeat heartbeat = 5; // 心跳状态
+}
+
+// 发送群心跳响应
+message SendGroupHeartbeatRsp {
+    int32 code = 1; // 错误码
+    string msg = 2; // 错误信息
+}

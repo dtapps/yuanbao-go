@@ -1,0 +1,184 @@
+syntax = "proto3";
+
+// 对应 Conn 连接层协议
+package yuanbao_conn;
+
+// 生成的 Go 代码存放位置
+option go_package = "yuanbao-go/wsproto/conn";
+
+// 时间格式不统一，需要转换为 google.protobuf.Timestamp
+// import "google/protobuf/timestamp.proto";
+
+// 时间单位（秒/毫秒）混淆，需要转换为 google.protobuf.Duration.Duration
+// import "google/protobuf/duration.proto";
+
+// 静态语言缺乏灵活性
+// import "google/protobuf/any.proto";
+
+// 全量覆盖导致的脏写
+// import "google/protobuf/field_mask.proto";
+
+// 静态定义信息不足
+// import "google/protobuf/descriptor.proto";
+
+
+// 元数据键值对，用于传递额外信息
+message HeadMeta {
+    string key = 1;   // 元数据键
+    string value = 2; // 元数据值
+}
+
+// 消息头，包含消息的控制信息和元数据
+message Head {
+    uint32 cmdType = 1;      // 命令类型
+    string cmd = 2;         // 命令名称
+    uint32 seqNo = 3;       // 序列号，用于请求响应配对
+    string msgId = 4;       // 消息唯一ID
+    string module = 5;      // 模块名称
+    bool needAck = 6;        // 是否需要ack确认
+    repeated HeadMeta meta = 7; // 扩展元数据列表
+    int32 status = 8;        // 响应状态码
+}
+
+// 完整的连接消息，包含消息头和消息体
+message ConnMsg {
+    Head head = 1;   // 消息头
+    bytes data = 2;  // 消息体二进制数据
+}
+
+// 定向推送消息，用于服务器主动推送消息给客户端
+message DirectedPush {
+    uint32 type = 1;    // 推送类型
+    string content = 2; // 推送内容
+}
+
+// 认证信息，包含用户身份验证所需的凭证
+message AuthInfo {
+    string uid = 1;    // 用户ID
+    string source = 2;  // 来源标识
+    string token = 3;   // 认证令牌
+}
+
+// 错误码枚举
+enum RetCode {
+    SUCCESS = 0;                       // 成功
+    PARAMS_INVALID = 1;                // 参数无效
+    AUTH_FAIL = 2;                     // 认证失败
+    UNKNOWN_ROUTE = 3;                 // 未知路由
+    ALREADY_AUTH = 4;                  // 已认证
+    SAME_KIND_DEV_LOGIN = 5;           // 同类型设备已登录
+    AUTH_TOKEN_INVALID = 6;            // 认证令牌无效
+    AUTH_TOKEN_EXPIRED = 7;            // 认证令牌已过期
+    AUTH_USER_NOT_REGISTERED = 8;      // 用户未注册
+    AUTH_USER_FORBIDDEN = 9;            // 用户被禁用
+    AUTH_USER_UNQUALIFIED = 10;         // 用户不合格
+    AUTH_TOKEN_FORCED_EXPIRATION = 11;  // 令牌被强制过期
+    PROHIBIT_APP_VERSION = 12;         // 禁止的App版本
+    PACKAGE_SIGN_ILLEGAL = 13;         // 包签名非法
+    INNER_SVR_FAIL = 14;               // 内部服务错误
+    OVERLOAD_CONTROL = 15;             // 过载控制
+    SET_STATE_CONFLICT = 16;           // 状态设置冲突
+    CONN_OVER_LIMIT = 17;              // 连接数超限
+    NO_USER_ONLINE = 18;               // 用户不在线
+    PARTIAL_FAIL = 19;                 // 部分失败
+    NET_FAIL = 20;                     // 网络错误
+    BACKEND_RETURN_FAIL = 21;          // 后端返回失败
+    USER_OFFLINE = 22;                 // 用户离线
+    USER_NOT_EXIST = 23;               // 用户不存在
+}
+
+// 设备信息，包含客户端设备和应用的相关信息
+message DeviceInfo {
+    string appVersion = 1;           // App版本号
+    string appOperationSystem = 2;   // 操作系统
+    string appBundleId = 3;          // App Bundle ID
+    string qimei = 4;                // Qimei设备标识
+    string qimei36 = 5;              // Qimei36设备标识
+    string h38 = 6;                 // H38设备标识
+    string language = 7;             // 语言设置
+    string deviceId = 8;             // 设备ID
+    string deviceName = 9;           // 设备名称
+    string instanceId = 10;          // 实例ID
+    string tid = 11;                 // 终端ID
+    string uskey = 12;               // 用户会话Key
+    string busParamsMd5 = 13;        // 业务参数MD5
+    string packageType = 14;          // 包类型
+    string appPublishChannel = 15;   // App发布渠道
+    string signVersion = 16;         // 签名版本
+    string packageSignature = 17;    // 包签名
+    string brand = 18;               // 设备品牌
+    string h42 = 19;                 // H42设备标识
+    string xDeviceId = 20;           // X设备ID
+    string xPlatform = 21;           // X平台标识
+    string dialToken = 22;           // 拨号Token
+    string qimei36Token = 23;        // Qimei36 Token
+    string botVersion = 24;          // Bot版本
+}
+
+// 容器信息，用于标识客户端容器类型
+message Container {
+    int32 type = 1;        // 容器类型
+    string uniqueKey = 2;   // 唯一键
+}
+
+// 认证绑定请求，客户端发起认证绑定的请求
+message AuthBindReq {
+    string bizId = 1;             // 业务ID
+    AuthInfo authInfo = 2;        // 认证信息
+    DeviceInfo deviceInfo = 3;    // 设备信息
+    Container containerInfo = 4;  // 容器信息
+    string envName = 5;           // 环境名称
+    uint32 bindMode = 6;          // 绑定模式
+    string forceToken = 7;        // 强制令牌
+}
+
+// 认证绑定响应，服务器返回认证绑定结果
+message AuthBindRsp {
+    int32 code = 1;         // 错误码
+    string message = 2;      // 错误信息
+    string connectId = 3;   // 连接ID
+    uint64 timestamp = 4;   // 时间戳
+    string clientIp = 5;    // 客户端IP
+}
+
+// 心跳请求，客户端发送心跳保活
+message PingReq {
+}
+
+// 心跳响应，服务器回复心跳并携带心跳间隔
+message PingRsp {
+    uint32 heartInterval = 1; // 心跳间隔（秒）
+    uint64 timestamp = 2;     // 服务器时间戳
+}
+
+// 踢出消息，服务器强制客户端下线
+message KickoutMsg {
+    int32 status = 1;              // 状态码
+    string reason = 2;             // 踢出原因
+    string otherDeviceName = 3;   // 其他设备名称
+}
+
+// 元数据键值对
+message Meta {
+    string key = 1;   // 键
+    string value = 2;  // 值
+}
+
+// 更新元数据请求
+message UpdateMetaReq {
+    repeated Meta metaInfos = 1; // 元数据信息列表
+}
+
+// 更新元数据响应
+message UpdateMetaRsp {
+    int32 code = 1;    // 错误码
+    string message = 2; // 错误信息
+}
+
+// 推送消息，服务器主动推送消息给客户端
+message PushMsg {
+    string cmd = 1;     // 命令
+    string module = 2;   // 模块
+    string msgId = 3;   // 消息ID
+    bytes data = 4;     // 消息数据
+}

@@ -1,8 +1,8 @@
 package account
 
 import (
+	"fmt"
 	"sync"
-	"time"
 
 	"github.com/dtapps/yuanbao-go/logger"
 	"github.com/dtapps/yuanbao-go/types"
@@ -11,8 +11,8 @@ import (
 // Manager 账号管理器
 type Manager struct {
 	mu       sync.RWMutex
-	accounts map[string]*types.Account
-	botIds   map[string]string // accountId -> botId
+	accounts map[string]*types.Account // accountID -> Account
+	botIDs   map[string]string         // accountID -> botID
 	log      *logger.Logger
 }
 
@@ -34,136 +34,134 @@ func GetManager() *Manager {
 func NewManager() *Manager {
 	return &Manager{
 		accounts: make(map[string]*types.Account),
-		botIds:   make(map[string]string),
+		botIDs:   make(map[string]string),
 		log:      logger.New("account"),
 	}
 }
 
 // ResolveAccount 解析账号
-func (m *Manager) ResolveAccount(cfg *types.Config, accountId string) *types.Account {
+func (m *Manager) ResolveAccount(cfg *types.Config, accountID string) *types.Account {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	account := &types.Account{
-		AccountID: accountId,
+		AccountID: accountID,
 	}
 
 	// 合并配置
 	if cfg != nil && cfg.Yuanbao != nil {
-		accountConfig := cfg.Yuanbao
+		yuanbaoConfig := cfg.Yuanbao
 
-		if accountConfig.Enabled != nil {
-			account.Enabled = *accountConfig.Enabled
-		} else {
-			account.Enabled = true
+		if yuanbaoConfig.Enabled != nil {
+			account.Enabled = *yuanbaoConfig.Enabled
 		}
 
-		account.AppKey = accountConfig.AppKey
-		account.AppSecret = accountConfig.AppSecret
-		account.Token = accountConfig.Token
-		account.ApiDomain = accountConfig.ApiDomain
-		if account.ApiDomain == "" {
-			account.ApiDomain = "bot.yuanbao.tencent.com"
-		}
-		account.WsGatewayUrl = accountConfig.WsUrl
-		if account.WsGatewayUrl == "" {
-			account.WsGatewayUrl = "wss://bot-wss.yuanbao.tencent.com/wss/connection"
+		account.WSEndpoint = types.DefaultWSEndpoint
+		if account.WSEndpoint == "" {
+			account.WSEndpoint = types.DefaultWSEndpoint
 		}
 
-		account.OverflowPolicy = accountConfig.OverflowPolicy
+		account.TokenEndpoint = types.DefaultTokenEndpoint
+		if account.TokenEndpoint == "" {
+			account.TokenEndpoint = types.DefaultTokenEndpoint
+		}
+
+		account.AppID = yuanbaoConfig.AppID
+		account.AppSecret = yuanbaoConfig.AppSecret
+		if account.AppID != "" && account.AppSecret != "" {
+			account.Configured = true
+		}
+
+		account.OverflowPolicy = yuanbaoConfig.OverflowPolicy
 		if account.OverflowPolicy == "" {
 			account.OverflowPolicy = "split"
 		}
-		account.ReplyToMode = accountConfig.ReplyToMode
+		account.ReplyToMode = yuanbaoConfig.ReplyToMode
 		if account.ReplyToMode == "" {
 			account.ReplyToMode = "first"
 		}
 
 		account.MediaMaxMb = 20
-		if accountConfig.MediaMaxMb > 0 {
-			account.MediaMaxMb = accountConfig.MediaMaxMb
+		if yuanbaoConfig.MediaMaxMb > 0 {
+			account.MediaMaxMb = yuanbaoConfig.MediaMaxMb
 		}
 
 		account.HistoryLimit = 100
-		if accountConfig.HistoryLimit > 0 {
-			account.HistoryLimit = accountConfig.HistoryLimit
+		if yuanbaoConfig.HistoryLimit > 0 {
+			account.HistoryLimit = yuanbaoConfig.HistoryLimit
 		}
 
-		if accountConfig.DisableBlockStreaming != nil {
-			account.DisableBlockStreaming = *accountConfig.DisableBlockStreaming
+		if yuanbaoConfig.DisableBlockStreaming != nil {
+			account.DisableBlockStreaming = *yuanbaoConfig.DisableBlockStreaming
 		}
 
-		if accountConfig.RequireMention != nil {
-			account.RequireMention = *accountConfig.RequireMention
+		if yuanbaoConfig.RequireMention != nil {
+			account.RequireMention = *yuanbaoConfig.RequireMention
 		} else {
 			account.RequireMention = true
 		}
 
-		account.FallbackReply = accountConfig.FallbackReply
-		if accountConfig.MarkdownHintEnabled != nil {
-			account.MarkdownHintEnabled = *accountConfig.MarkdownHintEnabled
+		account.FallbackReply = yuanbaoConfig.FallbackReply
+		if yuanbaoConfig.MarkdownHintEnabled != nil {
+			account.MarkdownHintEnabled = *yuanbaoConfig.MarkdownHintEnabled
 		} else {
 			account.MarkdownHintEnabled = true
 		}
 
 		account.WsMaxReconnectAttempts = 100
-		if accountConfig.WsMaxReconnectAttempts > 0 {
-			account.WsMaxReconnectAttempts = accountConfig.WsMaxReconnectAttempts
+		if yuanbaoConfig.WsMaxReconnectAttempts > 0 {
+			account.WsMaxReconnectAttempts = yuanbaoConfig.WsMaxReconnectAttempts
 		}
 
-		account.Configured = account.AppKey != "" && account.AppSecret != ""
-		account.Config = accountConfig
+		account.Config = yuanbaoConfig
 	}
 
 	// 检查 botId 缓存
-	if botId, ok := m.botIds[accountId]; ok {
+	if botId, ok := m.botIDs[accountID]; ok {
 		account.BotID = botId
 	}
 
-	m.log.Debug("解析账号", logger.F("accountId", accountId), logger.F("configured", account.Configured))
+	m.log.Debug("解析账号",
+		logger.F("accountID", accountID),
+		logger.F("configured", account.Configured),
+	)
 
 	return account
 }
 
-// SetBotId 设置 Bot ID
-func (m *Manager) SetBotId(accountId, botId string) {
+// AddAccount 设置账号
+func (m *Manager) AddAccount(accountID string, account *types.Account) (*types.Account, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.botIds[accountId] = botId
-	m.log.Info("设置BotID", logger.F("accountId", accountId), logger.F("botId", botId))
+
+	m.accounts[accountID] = account
+
+	return account, nil
 }
 
-// GetBotId 获取 Bot ID
-func (m *Manager) GetBotId(accountId string) string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.botIds[accountId]
-}
-
-// GetAccount 获取账号
-func (m *Manager) GetAccount(accountId string) *types.Account {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.accounts[accountId]
-}
-
-// SetAccount 设置账号
-func (m *Manager) SetAccount(accountId string, account *types.Account) {
+// UpdateAccount 更新账号
+func (m *Manager) UpdateAccount(accountID string, account *types.Account) (*types.Account, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.accounts[accountId] = account
+
+	m.accounts[accountID] = account
+
+	return account, nil
 }
 
 // DeleteAccount 删除账号
-func (m *Manager) DeleteAccount(accountId string) {
+func (m *Manager) DeleteAccount(accountID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.accounts, accountId)
-	delete(m.botIds, accountId)
+
+	delete(m.accounts, accountID)
+	delete(m.botIDs, accountID)
+
+	return nil
 }
 
 // ListAccounts 列出所有账号
-func (m *Manager) ListAccounts() []*types.Account {
+func (m *Manager) ListAccounts() *types.AccountListAccountsResponse {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -171,156 +169,79 @@ func (m *Manager) ListAccounts() []*types.Account {
 	for _, account := range m.accounts {
 		accounts = append(accounts, account)
 	}
-	return accounts
-}
 
-// TokenCache Token缓存
-type TokenCache struct {
-	mu        sync.RWMutex
-	data      *types.AuthResult
-	expiresAt int64
-}
-
-// TokenCacheManager Token缓存管理器
-type TokenCacheManager struct {
-	mu     sync.RWMutex
-	caches map[string]*TokenCache
-	log    *logger.Logger
-}
-
-// 全局Token缓存管理器
-var (
-	globalTokenCache *TokenCacheManager
-	tokenCacheOnce   sync.Once
-)
-
-// GetTokenCacheManager 获取Token缓存管理器
-func GetTokenCacheManager() *TokenCacheManager {
-	tokenCacheOnce.Do(func() {
-		globalTokenCache = NewTokenCacheManager()
-	})
-	return globalTokenCache
-}
-
-// NewTokenCacheManager 创建Token缓存管理器
-func NewTokenCacheManager() *TokenCacheManager {
-	return &TokenCacheManager{
-		caches: make(map[string]*TokenCache),
-		log:    logger.New("token-cache"),
+	return &types.AccountListAccountsResponse{
+		Total:    len(m.accounts),
+		Accounts: accounts,
 	}
 }
 
-// Get 获取缓存的Token
-func (m *TokenCacheManager) Get(accountId string) *types.AuthResult {
+// GetAccount 获取账号
+func (m *Manager) GetAccount(accountID string) (*types.Account, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	cache, ok := m.caches[accountId]
-	if !ok {
-		m.log.Debug("Token缓存未命中", logger.F("accountId", accountId))
-		return nil
+	if account, ok := m.accounts[accountID]; ok {
+		return account, nil
 	}
 
-	if time.Now().UnixMilli() > cache.expiresAt {
-		m.log.Debug("Token缓存已过期", logger.F("accountId", accountId))
-		return nil
-	}
-
-	m.log.Debug("Token缓存命中", logger.F("accountId", accountId))
-	return cache.data
+	return &types.Account{AccountID: accountID}, fmt.Errorf("account not found: %s", accountID)
 }
 
-// Set 设置Token缓存
-func (m *TokenCacheManager) Set(accountId string, data *types.AuthResult, durationMs int64) {
+// AddBotID 添加 Bot ID
+func (m *Manager) AddBotID(accountID string, botID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	expiresAt := time.Now().UnixMilli() + durationMs
-	if durationMs <= 0 {
-		expiresAt = time.Now().Add(24 * time.Hour).UnixMilli()
-	}
+	m.botIDs[accountID] = botID
 
-	m.caches[accountId] = &TokenCache{
-		data:      data,
-		expiresAt: expiresAt,
-	}
-
-	m.log.Info("Token已缓存", logger.F("accountId", accountId), logger.F("durationMs", durationMs))
+	return nil
 }
 
-// Clear 清除缓存
-func (m *TokenCacheManager) Clear(accountId string) {
+// UpdateBotID 更新 Bot ID
+func (m *Manager) UpdateBotID(accountID string, botID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.caches, accountId)
+
+	m.botIDs[accountID] = botID
+
+	return nil
 }
 
-// ClearAll 清除所有缓存
-func (m *TokenCacheManager) ClearAll() {
+// DeleteBotID 删除 Bot ID
+func (m *Manager) DeleteBotID(accountID string, botID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.caches = make(map[string]*TokenCache)
+
+	delete(m.botIDs, accountID)
+
+	return nil
 }
 
-// BotIdCache Bot ID缓存
-type BotIdCache struct {
-	mu        sync.RWMutex
-	botIds    map[string]string // accountId -> botId
-	expiresAt map[string]int64
-}
+// ListBotIDs 列出所有 Bot ID
+func (m *Manager) ListBotIDs() *types.AccountListBotIDsResponse {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-// 全局Bot ID缓存
-var (
-	globalBotIdCache *BotIdCache
-	botIdCacheOnce   sync.Once
-)
-
-// GetBotIdCache 获取Bot ID缓存
-func GetBotIdCache() *BotIdCache {
-	botIdCacheOnce.Do(func() {
-		globalBotIdCache = &BotIdCache{
-			botIds:    make(map[string]string),
-			expiresAt: make(map[string]int64),
-		}
-	})
-	return globalBotIdCache
-}
-
-// Get 获取Bot ID
-func (c *BotIdCache) Get(accountId string) string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if time.Now().UnixMilli() > c.expiresAt[accountId] {
-		return ""
+	botIDs := make([]*string, 0, len(m.botIDs))
+	for accountID := range m.botIDs {
+		botIDs = append(botIDs, &accountID)
 	}
 
-	return c.botIds[accountId]
-}
-
-// Set 设置Bot ID
-func (c *BotIdCache) Set(accountId, botId string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.botIds[accountId] = botId
-	// 默认24小时过期
-	c.expiresAt[accountId] = time.Now().Add(24 * time.Hour).UnixMilli()
-}
-
-// ResolveOverflowPolicy 解析溢出策略
-func ResolveOverflowPolicy(raw string) string {
-	if raw == "stop" {
-		return "stop"
+	return &types.AccountListBotIDsResponse{
+		Total:  len(m.botIDs),
+		BotIDs: botIDs,
 	}
-	return "split"
 }
 
-// ResolveReplyToMode 解析回复模式
-func ResolveReplyToMode(raw string) string {
-	switch raw {
-	case "off", "all":
-		return raw
-	default:
-		return "first"
+// GetBotID 获取 Bot ID
+func (m *Manager) GetBotID(accountID string) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if botID, ok := m.botIDs[accountID]; ok {
+		return botID, nil
 	}
+
+	return "", fmt.Errorf("botID not found: %s", accountID)
 }

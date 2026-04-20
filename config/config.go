@@ -5,6 +5,9 @@ import "github.com/dtapps/yuanbao-go/types"
 // DefaultConfig 返回默认配置
 func DefaultConfig() *types.YuanbaoConfig {
 	return &types.YuanbaoConfig{
+		Enabled:                boolPtr(true),
+		WSEndpoint:             types.DefaultWSEndpoint,
+		TokenEndpoint:          types.DefaultTokenEndpoint,
 		OverflowPolicy:         "split",
 		ReplyToMode:            "first",
 		OutboundQueueStrategy:  "merge-text",
@@ -17,8 +20,6 @@ func DefaultConfig() *types.YuanbaoConfig {
 		RequireMention:         boolPtr(true),
 		FallbackReply:          "暂时无法解答，你可以换个问题问问我哦",
 		MarkdownHintEnabled:    boolPtr(true),
-		ApiDomain:              "bot.yuanbao.tencent.com",
-		WsUrl:                  "wss://bot-wss.yuanbao.tencent.com/wss/connection",
 		WsMaxReconnectAttempts: 100,
 	}
 }
