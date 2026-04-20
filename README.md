@@ -1,20 +1,8 @@
-# YuanBao Go 客户端
+# Yuanbao Go SDK
 
-腾讯元宝智能机器人 Go 语言客户端，支持私聊和群聊功能。
+腾讯元宝智能机器人 Go 语言客户端，支持 WebSocket 长连接、私聊和群聊消息收发。
 
-参考 [腾讯元宝智能机器人频道插件](https://www.npmjs.com/package/openclaw-plugin-yuanbao) 实现
-
-## 功能特性
-
-- WebSocket 长连接
-- Protobuf 消息编解码
-- 私聊消息收发
-- 群聊消息收发
-- @提及处理
-- 消息引用回复
-- 媒体消息支持
-- 成员管理
-- 自动重连
+参考 [openclaw-plugin-yuanbao](https://www.npmjs.com/package/openclaw-plugin-yuanbao) 实现
 
 ## 安装
 
@@ -22,13 +10,12 @@
 go get github.com/dtapps/yuanbao-go
 ```
 
-## 快速开始
+## 获取凭证
 
-### 环境要求
+1. 登录 [腾讯元宝](https://bot.yuanbao.tencent.com) App
+2. 创建应用获取 `AppID` 和 `AppSecret`
 
-- Go 1.21+
-
-### 基本使用
+## 使用示例
 
 ```go
 package main
@@ -42,60 +29,31 @@ import (
 	"github.com/dtapps/yuanbao-go/types"
 )
 
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func main() {
-	// 创建配置
-	cfg := &config.Config{
-		Yuanbao: &config.YuanbaoConfig{
-			AppKey:    os.Getenv("YUANBAO_APP_KEY"),
-			AppSecret: os.Getenv("YUANBAO_APP_SECRET"),
-		},
-	}
+	// 日志
+	logger.SetLevel(logger.LevelDebug)
+	l := logger.GetLogger("demo")
+
+	// 获取默认配置
+	defaultCfg := config.DefaultConfig()
+	defaultCfg.AppID = "your-app-id"
+	defaultCfg.AppSecret = "your-app-secret"
+	defaultCfg.RequireMention = boolPtr(true) // 群消息需要 @ 机器人才触发回调
 
 	// 创建客户端
-	client, err := yuanbao.NewClient("default", cfg)
+	client, err := yuanbao.NewClient("default", &types.Config{
+		Yuanbao: defaultCfg,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Stop()
 
-	// 设置消息处理
-	client.OnMessage(func(msg *types.InboundMessage, chatType string) {
-		from := msg.FromAccount
-		if msg.SenderNickname != "" {
-			from = msg.SenderNickname
-		}
-
-		var text string
-		for _, elem := range msg.MsgBody {
-			if elem.MsgType == "TIMTextElem" {
-				text = elem.MsgContent.Text
-				break
-			}
-		}
-
-		if chatType == "group" {
-			fmt.Printf("[%s] 群:%s(%s) 用户:%s(%s): %s\n", chatType, msg.GroupCode, msg.GroupName, msg.SenderNickname, msg.FromAccount, text)
-		} else {
-			fmt.Printf("[%s] 用户:%s(%s): %s\n", chatType, msg.SenderNickname, msg.FromAccount, text)
-		}
-
-		// 自动回复
-		reply := fmt.Sprintf("收到: %s", text)
-		if chatType == "group" {
-			err := client.SendGroupMessage(msg.GroupCode, reply)
-			if err != nil {
-				fmt.Println("发送群消息失败", err)
-			}
-		} else {
-			err := client.SendMessage(msg.FromAccount, reply)
-			if err != nil {
-				fmt.Println("发送私聊消息失败", err)
-			}
-		}
-		fmt.Println("已回复:", reply)
-	})
-
-	// 设置连接状态
+	// 设置连接状态回调
 	client.OnConnected(func() {
 		fmt.Println("✓ 已连接到元宝服务器")
 	})
@@ -104,135 +62,76 @@ func main() {
 		fmt.Println("✗ 已断开连接")
 	})
 
+	// 设置消息处理
+	client.OnMessage(func(msg *types.InboundMessage, chatType types.ChatType) {
+		// 提取文本内容
+		content := ""
+		for _, segment := range msg.Content {
+			content += segment.Text
+		}
+
+		fmt.Printf("[%s] 收到消息: %s\n", chatType, content)
+
+		// 自动回复
+		reply := fmt.Sprintf("收到: %s", content)
+		if chatType == types.ChatTypeGroup {
+			atList := make([]types.AtInfo, 0, len(msg.AtList))
+			if len(msg.AtList) > 0 {
+				atList = append(atList, types.AtInfo{
+					UserID:   msg.SenderID,
+					UserName: msg.SenderName,
+				})
+			}
+			_, err := client.SendGroupMessage(&types.OutboundGroupMessage{
+				ToGroupID: msg.GroupID,
+				Text:      reply,
+				AtList:    atList,
+			})
+			if err != nil {
+				fmt.Println("发送群消息失败:", err)
+			}
+		} else {
+			_, err := client.SendMessage(&types.OutboundC2CMessage{
+				ToUserID: msg.RecipientID,
+				Text:     reply,
+			})
+			if err != nil {
+				fmt.Println("发送私聊消息失败:", err)
+			}
+		}
+		fmt.Println("已回复:", reply)
+	})
+
 	fmt.Println("正在连接...")
 
 	select {}
 }
 ```
 
-## 配置选项
+## 配置
 
-```go
-cfg := &config.Config{
-    Yuanbao: &config.YuanbaoConfig{
-        AppKey:                  "your-app-key",
-        AppSecret:               "your-app-secret",
-        Token:                   "optional-token",
-        ApiDomain:               "bot.yuanbao.tencent.com", // 默认值
-        WsUrl:                  "wss://bot-wss.yuanbao.tencent.com/wss/connection", // 默认值
-        WsMaxReconnectAttempts: 100, // 默认值
-        
-        // 消息策略
-        OverflowPolicy:         "split", // "stop" | "split"
-        ReplyToMode:           "first", // "off" | "first" | "all"
-        OutboundQueueStrategy: "merge-text", // "immediate" | "merge-text"
-        MinChars:              2800, // 消息聚合最小字符数
-        MaxChars:              3000, // 单条消息最大字符数
-        
-        // 群聊设置
-        RequireMention:        true,  // 群聊是否需要@机器人
-        HistoryLimit:          100,   // 群聊上下文历史条数
-        
-        // 其他
-        MediaMaxMb:            20,    // 媒体文件大小上限
-        DisableBlockStreaming: false, // 禁用分块流式输出
-        FallbackReply:         "暂时无法解答，你可以换个问题问问我哦",
-        MarkdownHintEnabled:   true,  // 注入Markdown格式指令
-    },
-}
-```
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| AppID | 是 | 应用ID |
+| AppSecret | 是 | 应用密钥 |
+| Enabled | 否 | 是否启用，默认 true |
+| WSEndpoint | 否 | WebSocket 端点，默认 wss://bot-wss.yuanbao.tencent.com/wss/connection |
+| TokenEndpoint | 否 | Token 端点，默认 bot.yuanbao.tencent.com |
+| OverflowPolicy | 否 | 消息溢出策略："stop" 或 "split"，默认 "split" |
+| ReplyToMode | 否 | 引用回复模式："off"、"first" 或 "all"，默认 "first" |
+| OutboundQueueStrategy | 否 | 出站队列策略："immediate" 或 "merge-text"，默认 "merge-text" |
+| MinChars | 否 | 消息聚合最小字符数，默认 2800 |
+| MaxChars | 否 | 单条消息最大字符数，默认 3000 |
+| IdleMs | 否 | 空闲自动发送超时（毫秒），默认 5000 |
+| MediaMaxMb | 否 | 媒体文件大小上限（MB），默认 20 |
+| HistoryLimit | 否 | 群聊上下文历史条数，默认 100 |
+| DisableBlockStreaming | 否 | 禁用分块流式输出，默认 false |
+| RequireMention | 否 | 群聊是否需要@机器人，默认 true |
+| FallbackReply | 否 | 兜底回复文案 |
+| MarkdownHintEnabled | 否 | 注入 Markdown 格式指令，默认 true |
+| WsMaxReconnectAttempts | 否 | 最大重连次数，默认 100 |
+| RouteEnv | 否 | 路由环境 |
 
-## API 文档
+## License
 
-### Client
-
-#### NewClient(accountId string, cfg *config.Config) (*Client, error)
-
-创建新客户端。
-
-#### OnMessage(handler func(msg *types.InboundMessage, chatType string))
-
-设置消息处理回调。
-
-#### OnConnected(handler func())
-
-设置连接成功回调。
-
-#### OnDisconnected(handler func())
-
-设置断开连接回调。
-
-#### SendMessage(to string, text string) error
-
-发送私聊消息。
-
-#### SendGroupMessage(groupCode string, text string) error
-
-发送群聊消息。
-
-#### GetState() string
-
-获取连接状态。
-
-#### Stop() error
-
-停止客户端。
-
-### Member
-
-#### RecordUser(groupCode, userId, nickName string)
-
-记录群用户。
-
-#### RecordC2cUser(userId, nickName string)
-
-记录 C2C 用户。
-
-#### QueryMembers(groupCode, nameFilter string) []*UserRecord
-
-查询群成员。
-
-#### QueryGroupOwner(groupCode string) *UserRecord
-
-查询群主。
-
-#### QueryGroupInfo(groupCode string) *GroupInfo
-
-查询群信息。
-
-## 消息类型
-
-```go
-type InboundMessage struct {
-    CallbackCommand      string            // 回调命令
-    FromAccount         string            // 发送者账号
-    ToAccount           string            // 接收者账号
-    SenderNickname      string            // 发送者昵称
-    GroupCode           string            // 群代码
-    GroupName           string            // 群名称
-    MsgSeq              uint32            // 消息序列号
-    MsgID               string            // 消息ID
-    MsgBody            []MsgBodyElement   // 消息体
-    CloudCustomData     string            // 自定义数据
-    BotOwnerID         string            // Bot所有者ID
-    TraceID            string            // 追踪ID
-}
-
-type MsgBodyElement struct {
-    MsgType   string      // 消息类型
-    MsgContent MsgContent // 消息内容
-}
-
-type MsgContent struct {
-    Text        string // 文本内容
-    UUID        string // 文件UUID
-    ImageFormat uint32 // 图片格式
-    URL         string // 资源URL
-    FileSize    uint32 // 文件大小
-    FileName    string // 文件名
-}
-```
-
-## 许可证
-
-MIT License
+MIT
