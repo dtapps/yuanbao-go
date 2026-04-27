@@ -72,7 +72,7 @@ func (c *WsClient) sendHeartbeatMessage() {
 		return
 	}
 
-	c.log.Info("发送心跳消息成功",
+	c.log.Debug("发送心跳消息成功",
 		logger.F("messageID", messageID),
 		logger.F("data", string(data)),
 	)
