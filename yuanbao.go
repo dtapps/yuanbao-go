@@ -10,13 +10,25 @@ import (
 	"github.com/dtapps/yuanbao-go/types"
 )
 
+// 错误定义
+var (
+	ErrAccountNotConfigured = fmt.Errorf("账号未配置")
+)
+
+// WithTokenCallback 设置 Token 回调
+func WithTokenCallback(handler func(data *types.TokenCallbackData)) plugin.ClientOption {
+	return func(p *plugin.Plugin) {
+		p.SetOnToken(handler)
+	}
+}
+
 // Client 元宝客户端
 type Client struct {
 	plugin *plugin.Plugin
 }
 
 // NewClient 创建新客户端
-func NewClient(accountID string, cfg *types.Config) (*Client, error) {
+func NewClient(accountID string, cfg *types.Config, options ...plugin.ClientOption) (*Client, error) {
 	// 创建账号管理器
 	accountMgr := account.NewManager()
 
@@ -30,7 +42,7 @@ func NewClient(accountID string, cfg *types.Config) (*Client, error) {
 	pluginMgr := plugin.NewPluginManager()
 
 	// 创建并启动插件
-	p, err := plugin.CreateAndStart(pluginMgr, accountID, acc, cfg)
+	p, err := plugin.CreateAndStart(pluginMgr, accountID, acc, cfg, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +70,11 @@ func (c *Client) OnDisconnected(handler func()) {
 // OnError 设置错误回调
 func (c *Client) OnError(handler func(err error)) {
 	c.plugin.SetOnError(handler)
+}
+
+// OnToken 设置 Token 回调
+func (c *Client) OnToken(handler func(data *types.TokenCallbackData)) {
+	c.plugin.SetOnToken(handler)
 }
 
 // SendMessage 发送消息
@@ -97,8 +114,3 @@ func (c *Client) GetTokenManager() *token.Manager {
 func (c *Client) Stop() error {
 	return c.plugin.Stop()
 }
-
-// 错误定义
-var (
-	ErrAccountNotConfigured = fmt.Errorf("账号未配置")
-)

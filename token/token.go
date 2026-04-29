@@ -20,6 +20,7 @@ type Manager struct {
 	cache      *types.TokenCache
 	httpClient *http.Client
 	log        *logger.Logger
+	callback   types.TokenCallback // Token 回调
 }
 
 // 全局 Token 管理器
@@ -60,7 +61,22 @@ func NewManager() *Manager {
 		cache:      nil,
 		httpClient: http.NewClient(),
 		log:        logger.New("token"),
+		callback:   nil,
 	}
+}
+
+// SetCallback 设置 Token 回调
+func (m *Manager) SetCallback(callback types.TokenCallback) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.callback = callback
+}
+
+// GetCallback 获取 Token 回调
+func (m *Manager) GetCallback() types.TokenCallback {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.callback
 }
 
 // isTokenValid 检查 Token 是否有效
@@ -135,6 +151,13 @@ func (m *Manager) FetchToken(appID string, appSecret string, tokenEndpoint strin
 				continue
 			}
 
+			// 调用回调（失败）
+			m.callCallback(&types.TokenCallbackData{
+				Status: "error",
+				AppID:  appID,
+				Error:  lastErr,
+			})
+
 			return nil, lastErr
 		}
 
@@ -147,12 +170,19 @@ func (m *Manager) FetchToken(appID string, appSecret string, tokenEndpoint strin
 				continue
 			}
 
+			// 调用回调（失败）
+			m.callCallback(&types.TokenCallbackData{
+				Status: "error",
+				AppID:  appID,
+				Error:  lastErr,
+			})
+
 			return nil, lastErr
 		}
 
 		result := &types.TokenResult{
-			AppID:      appID,                         // 应用ID
-			BotID:      response.Data.BotID,           // 机器人ID
+			AppID:      appID,                         // 应用 ID
+			BotID:      response.Data.BotID,           // 机器人 ID
 			Source:     response.Data.Source,          // 来源
 			Token:      response.Data.Token,           // Token
 			AcquiredAt: time.Now().Unix(),             // 获取时间（秒）
@@ -167,10 +197,33 @@ func (m *Manager) FetchToken(appID string, appSecret string, tokenEndpoint strin
 		}
 		m.mu.Unlock()
 
+		// 调用回调（成功）
+		m.callCallback(&types.TokenCallbackData{
+			Status:     "success",
+			Token:      result.Token,
+			AppID:      appID,
+			BotID:      result.BotID,
+			Source:     result.Source,
+			ExpiresIn:  result.ExpiresIn,
+			AcquiredAt: result.AcquiredAt,
+			ExpiresAt:  result.AcquiredAt + result.ExpiresIn,
+		})
+
 		return result, nil
 	}
 
 	return nil, lastErr
+}
+
+// callCallback 调用 Token 回调
+func (m *Manager) callCallback(data *types.TokenCallbackData) {
+	m.mu.RLock()
+	callback := m.callback
+	m.mu.RUnlock()
+
+	if callback != nil {
+		go callback(data)
+	}
 }
 
 // prepareTokenRequest 准备 Token 请求

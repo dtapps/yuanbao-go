@@ -385,6 +385,12 @@ func (p *Plugin) GetTokenManager() *token.Manager {
 	return token.GetManager(p.accountID)
 }
 
+// SetOnToken 设置 Token 回调
+func (p *Plugin) SetOnToken(handler func(data *types.TokenCallbackData)) {
+	tokenMgr := token.GetManager(p.accountID)
+	tokenMgr.SetCallback(handler)
+}
+
 // PluginManager 插件管理器
 type PluginManager struct {
 	mu      sync.RWMutex
@@ -455,9 +461,17 @@ func (m *PluginManager) StopAll() error {
 	return nil
 }
 
+// ClientOption 客户端选项
+type ClientOption func(*Plugin)
+
 // CreateAndStart 创建并启动插件
-func CreateAndStart(manager *PluginManager, accountID string, account *types.Account, cfg *types.Config) (*Plugin, error) {
+func CreateAndStart(manager *PluginManager, accountID string, account *types.Account, cfg *types.Config, options ...ClientOption) (*Plugin, error) {
 	plugin := manager.CreatePlugin(accountID, account, cfg)
+
+	// 应用选项（在启动前设置回调等）
+	for _, option := range options {
+		option(plugin)
+	}
 
 	if err := plugin.Start(); err != nil {
 		return nil, err

@@ -1,16 +1,32 @@
 package types
 
-// TokenCache Token缓存
+// TokenCallback Token 回调数据
+type TokenCallbackData struct {
+	Status     string // 状态：success | error
+	Token      string // Token
+	AppID      string // 应用 ID
+	BotID      string // 机器人 ID
+	Source     string // 来源
+	ExpiresIn  int64  // 过期时长（秒）
+	AcquiredAt int64  // 获取时间（秒）
+	ExpiresAt  int64  // 过期时间（秒）
+	Error      error  // 错误信息
+}
+
+// TokenCallback Token 回调函数
+type TokenCallback func(data *TokenCallbackData)
+
+// TokenCache Token 缓存
 type TokenCache struct {
 	Token      string // Token
 	AcquiredAt int64  // 获取时间（秒）
 	ExpiresAt  int64  // 过期时间（秒）
 }
 
-// TokenResult Token结果
+// TokenResult Token 结果
 type TokenResult struct {
-	AppID      string // 应用ID
-	BotID      string // 机器人ID
+	AppID      string // 应用 ID
+	BotID      string // 机器人 ID
 	Source     string // 来源
 	Token      string // Token
 	ExpiresIn  int64  // 过期时长（秒）
