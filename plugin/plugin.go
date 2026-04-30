@@ -385,12 +385,6 @@ func (p *Plugin) GetTokenManager() *token.Manager {
 	return token.GetManager(p.accountID)
 }
 
-// SetOnToken 设置 Token 回调
-func (p *Plugin) SetOnToken(handler func(data *types.TokenCallbackData)) {
-	tokenMgr := token.GetManager(p.accountID)
-	tokenMgr.SetCallback(handler)
-}
-
 // PluginManager 插件管理器
 type PluginManager struct {
 	mu      sync.RWMutex

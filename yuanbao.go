@@ -18,7 +18,7 @@ var (
 // WithTokenCallback 设置 Token 回调
 func WithTokenCallback(handler func(data *types.TokenCallbackData)) plugin.ClientOption {
 	return func(p *plugin.Plugin) {
-		p.SetOnToken(handler)
+		p.GetTokenManager().SetCallback(handler)
 	}
 }
 
@@ -70,11 +70,6 @@ func (c *Client) OnDisconnected(handler func()) {
 // OnError 设置错误回调
 func (c *Client) OnError(handler func(err error)) {
 	c.plugin.SetOnError(handler)
-}
-
-// OnToken 设置 Token 回调
-func (c *Client) OnToken(handler func(data *types.TokenCallbackData)) {
-	c.plugin.SetOnToken(handler)
 }
 
 // SendMessage 发送消息
