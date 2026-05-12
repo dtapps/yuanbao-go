@@ -16,11 +16,10 @@ func (c *WsClient) startHeartbeat() {
 
 	c.mu.Lock()
 	interval := c.heartbeatInterval
-	c.mu.Unlock()
-
 	c.heartbeatTimer = time.AfterFunc(interval, func() {
 		c.sendHeartbeatMessage()
 	})
+	c.mu.Unlock()
 }
 
 // stopHeartbeatLocked 停止并置空心跳定时器
@@ -40,9 +39,10 @@ func (c *WsClient) stopHeartbeat() {
 
 // sendHeartbeatMessage 发送心跳消息
 func (c *WsClient) sendHeartbeatMessage() {
-	c.mu.RLock()
+	// 使用 mu 保护 conn 引用（TOCTOU），但不使用 sendMu 避免阻塞业务消息
+	c.mu.Lock()
 	conn := c.conn
-	c.mu.RUnlock()
+	c.mu.Unlock()
 
 	if conn == nil {
 		return

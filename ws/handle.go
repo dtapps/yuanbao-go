@@ -127,8 +127,10 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 	}
 
 	// 认证成功
+	var connectID string
 	c.mu.Lock()
 	c.connectID = authBind.ConnectId
+	connectID = c.connectID // 在锁内读取，避免竞态
 	c.state = types.ConnectionStateConnected.String()
 	c.reconnectAttempts = 0
 	c.mu.Unlock()
@@ -139,7 +141,7 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 	// 回调
 	if c.callback != nil {
 		result := &types.OnReadyData{
-			ConnectID: c.connectID,
+			ConnectID: connectID,
 			Timestamp: time.Now().Unix(),
 		}
 		c.callback.OnReady(result)
@@ -152,6 +154,7 @@ func (c *WsClient) handleResponseTypePing(connMsg *connProto.ConnMsg) {
 	c.mu.Lock()
 	c.heartbeatAckReceived = true
 	c.heartbeatTimeoutCount = 0
+	c.lastHeartbeatAt = time.Now().UnixMilli()
 	c.mu.Unlock()
 
 	// 解析 ping 消息
@@ -163,8 +166,6 @@ func (c *WsClient) handleResponseTypePing(connMsg *connProto.ConnMsg) {
 	c.log.Debug("Ping响应",
 		logger.F("ping", ping),
 	)
-
-	c.lastHeartbeatAt = time.Now().UnixMilli()
 }
 
 // handleResponseTypeInboundMessage 处理消息推送

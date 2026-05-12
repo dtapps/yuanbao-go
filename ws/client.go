@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -80,12 +81,34 @@ type WsClient struct {
 	// 序列号
 	seqNo uint32
 
+	// 业务消息序列号
+	msgSeq uint64
+
+	// === 有序发送队列 ===
+	// 所有业务消息（C2C/Group）通过此队列串行发送，
+	// 保证无论调用方如何并发，消息都按入队顺序发出。
+	sendQueue   chan sendTask     // 任务队列（有缓冲）
+	sendOnce    sync.Once         // 确保 sender 只启动一次
+	senderDone  chan struct{}     // 用于通知 sender 退出
+
 	// 上下文
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	// 连接ID
 	connectID string
+}
+
+// sendTask 有序发送任务
+type sendTask struct {
+	execute func() (string, error) // 实际的发送逻辑
+	result  chan sendResult        // 结果回传通道
+}
+
+// sendResult 发送结果
+type sendResult struct {
+	msgID string
+	err   error
 }
 
 // NewWsClient 创建WebSocket客户端
@@ -103,6 +126,8 @@ func NewWsClient(url string, accountID string, botID string, callback WsClientCa
 		log:                  logger.New("ws"),
 		ctx:                  ctx,
 		cancel:               cancel,
+		sendQueue:            make(chan sendTask, 256), // 有缓冲队列，调用方可快速入队
+		senderDone:           make(chan struct{}),
 	}
 }
 
@@ -284,6 +309,14 @@ func (c *WsClient) close() {
 
 	c.log.Warn("正在关闭连接")
 
+	// 停止有序发送队列的 sender 协程
+	select {
+	case <-c.senderDone:
+		// 已经停止
+	default:
+		close(c.senderDone)
+	}
+
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
 			c.log.Error("关闭连接失败", logger.F("error", err.Error()))
@@ -326,6 +359,38 @@ func (c *WsClient) GetConnectID() string {
 	return c.connectID
 }
 
+// startSender 启动有序发送协程（懒加载，只启动一次）
+// 所有 SendC2CMessage/SendGroupMessage 的请求都会进入队列，
+// 由该协程按 FIFO 顺序逐条执行，保证消息有序性。
+func (c *WsClient) startSender() {
+	c.sendOnce.Do(func() {
+		go c.senderLoop()
+	})
+}
+
+// senderLoop 有序发送主循环
+// 从 sendQueue 中按序取出任务并执行，保证消息严格按入队顺序发出。
+func (c *WsClient) senderLoop() {
+	c.log.Info("[Sender] 有序发送协程已启动")
+	for {
+		select {
+		case <-c.senderDone:
+			// 客户端关闭，退出循环
+			// 排空剩余任务
+			for len(c.sendQueue) > 0 {
+				task := <-c.sendQueue
+				task.result <- sendResult{err: fmt.Errorf("客户端已关闭")}
+			}
+			c.log.Info("[Sender] 有序发送协程已停止")
+			return
+
+		case task := <-c.sendQueue:
+			msgID, err := task.execute()
+			task.result <- sendResult{msgID: msgID, err: err}
+		}
+	}
+}
+
 // generateNextSeqNo 生成下一个序列号
 func (c *WsClient) generateNextSeqNo() uint32 {
 	c.mu.Lock()
@@ -336,4 +401,16 @@ func (c *WsClient) generateNextSeqNo() uint32 {
 		c.seqNo = 1
 	}
 	return c.seqNo
+}
+
+// generateNextMsgSeq 生成下一个业务消息序号
+func (c *WsClient) generateNextMsgSeq() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.msgSeq++
+	if c.msgSeq == 0 {
+		c.msgSeq = 1
+	}
+	return c.msgSeq
 }
