@@ -34,15 +34,13 @@ func TestGenerateNextSeqNo_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan uint32, goroutines*iterations)
 
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+	for range goroutines {
+		wg.Go(func() {
+			for range iterations {
 				seq := client.generateNextSeqNo()
 				results <- seq
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -76,15 +74,13 @@ func TestGenerateNextMsgSeq_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan uint64, goroutines*iterations)
 
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+	for range goroutines {
+		wg.Go(func() {
+			for range iterations {
 				seq := client.generateNextMsgSeq()
 				results <- seq
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -216,21 +212,19 @@ func TestSendQueue_ConcurrentEnqueue(t *testing.T) {
 
 	// 启动多个 worker 模拟并发消费
 	var workerWg sync.WaitGroup
-	for w := 0; w < 4; w++ {
-		workerWg.Add(1)
-		go func() {
-			defer workerWg.Done()
+	for range 4 {
+		workerWg.Go(func() {
 			for task := range client.sendQueue {
-				task.execute()
+				_, _ = task.execute()
 				atomic.AddInt64(&processed, 1)
 				task.result <- sendResult{}
 			}
-		}()
+		})
 	}
 
 	// 高并发入队
 	var enqueueWg sync.WaitGroup
-	for i := 0; i < taskCount; i++ {
+	for i := range taskCount {
 		enqueueWg.Add(1)
 		go func(idx int) {
 			defer enqueueWg.Done()
@@ -263,12 +257,10 @@ func TestStartSender_OnlyOnce(t *testing.T) {
 	// 多次并发调用 startSender
 	const calls = 50
 	var wg sync.WaitGroup
-	for i := 0; i < calls; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range calls {
+		wg.Go(func() {
 			client.startSender()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -284,15 +276,13 @@ func TestConcurrentStateAccess(t *testing.T) {
 	const iterations = 1000
 	var wg sync.WaitGroup
 
-	for i := 0; i < iterations; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range iterations {
+		wg.Go(func() {
 			state := client.GetState()
 			if state == "" {
 				t.Error("状态不应为空")
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

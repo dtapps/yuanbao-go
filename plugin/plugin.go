@@ -385,6 +385,61 @@ func (p *Plugin) GetTokenManager() *token.Manager {
 	return token.GetManager(p.accountID)
 }
 
+// SyncCommands 同步命令列表到服务器
+// botCommands: 机器人内置命令列表
+// pluginCommands: 插件自定义命令列表
+func (p *Plugin) SyncCommands(botCommands, pluginCommands []types.BotCommand) error {
+	if p.client == nil || p.client.GetState() != types.ConnectionStateConnected.String() {
+		err := errors.New("not connected")
+		p.log.Error("同步命令失败", logger.F("error", err.Error()))
+		return err
+	}
+
+	data := &types.SyncInformationData{
+		SyncType:      types.SyncTypeCommands,
+		BotVersion:    p.version,
+		PluginVersion: p.version,
+		CommandData: types.SyncCommandsData{
+			BotCommands:    botCommands,
+			PluginCommands: pluginCommands,
+		},
+	}
+
+	// 打印同步的命令详情
+	p.log.Debug("同步命令详情",
+		logger.F("botVersion", data.BotVersion),
+		logger.F("pluginVersion", data.PluginVersion),
+	)
+
+	for i, cmd := range botCommands {
+		p.log.Debug("Bot命令",
+			logger.F("index", i),
+			logger.F("name", cmd.Name),
+			logger.F("description", cmd.Description),
+		)
+	}
+
+	for i, cmd := range pluginCommands {
+		p.log.Debug("Plugin命令",
+			logger.F("index", i),
+			logger.F("name", cmd.Name),
+			logger.F("description", cmd.Description),
+		)
+	}
+
+	if err := p.client.SyncInformation(data); err != nil {
+		p.log.Error("同步命令失败", logger.F("error", err.Error()))
+		return err
+	}
+
+	p.log.Info("同步命令成功",
+		logger.F("botCommands", len(botCommands)),
+		logger.F("pluginCommands", len(pluginCommands)),
+	)
+
+	return nil
+}
+
 // PluginManager 插件管理器
 type PluginManager struct {
 	mu      sync.RWMutex

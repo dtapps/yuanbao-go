@@ -123,6 +123,53 @@ func (EnumHeartbeat) EnumDescriptor() ([]byte, []int) {
 	return file_proto_biz_proto_rawDescGZIP(), []int{1}
 }
 
+// 同步信息类型枚举
+type SyncInformationType int32
+
+const (
+	SyncInformationType_SYNC_INFORMATION_TYPE_UNSPECIFIED SyncInformationType = 0 // 未指定
+	SyncInformationType_SYNC_INFORMATION_TYPE_COMMANDS    SyncInformationType = 1 // 命令列表
+)
+
+// Enum value maps for SyncInformationType.
+var (
+	SyncInformationType_name = map[int32]string{
+		0: "SYNC_INFORMATION_TYPE_UNSPECIFIED",
+		1: "SYNC_INFORMATION_TYPE_COMMANDS",
+	}
+	SyncInformationType_value = map[string]int32{
+		"SYNC_INFORMATION_TYPE_UNSPECIFIED": 0,
+		"SYNC_INFORMATION_TYPE_COMMANDS":    1,
+	}
+)
+
+func (x SyncInformationType) Enum() *SyncInformationType {
+	p := new(SyncInformationType)
+	*p = x
+	return p
+}
+
+func (x SyncInformationType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SyncInformationType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_biz_proto_enumTypes[2].Descriptor()
+}
+
+func (SyncInformationType) Type() protoreflect.EnumType {
+	return &file_proto_biz_proto_enumTypes[2]
+}
+
+func (x SyncInformationType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SyncInformationType.Descriptor instead.
+func (SyncInformationType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_biz_proto_rawDescGZIP(), []int{2}
+}
+
 // 消息序号信息，用于标识消息的序列号和消息ID
 type ImMsgSeq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1583,6 +1630,234 @@ func (x *SendGroupHeartbeatRsp) GetMsg() string {
 	return ""
 }
 
+// 机器人命令
+type Command struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`               // 命令名称，如 /help
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"` // 命令描述
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Command) Reset() {
+	*x = Command{}
+	mi := &file_proto_biz_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Command) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Command) ProtoMessage() {}
+
+func (x *Command) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_biz_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Command.ProtoReflect.Descriptor instead.
+func (*Command) Descriptor() ([]byte, []int) {
+	return file_proto_biz_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Command) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Command) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+// 同步命令数据
+type SyncCommandsData struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	BotCommands    []*Command             `protobuf:"bytes,1,rep,name=botCommands,proto3" json:"botCommands,omitempty"`       // 机器人命令列表
+	PluginCommands []*Command             `protobuf:"bytes,2,rep,name=pluginCommands,proto3" json:"pluginCommands,omitempty"` // 插件命令列表
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SyncCommandsData) Reset() {
+	*x = SyncCommandsData{}
+	mi := &file_proto_biz_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncCommandsData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncCommandsData) ProtoMessage() {}
+
+func (x *SyncCommandsData) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_biz_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncCommandsData.ProtoReflect.Descriptor instead.
+func (*SyncCommandsData) Descriptor() ([]byte, []int) {
+	return file_proto_biz_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SyncCommandsData) GetBotCommands() []*Command {
+	if x != nil {
+		return x.BotCommands
+	}
+	return nil
+}
+
+func (x *SyncCommandsData) GetPluginCommands() []*Command {
+	if x != nil {
+		return x.PluginCommands
+	}
+	return nil
+}
+
+// 同步信息请求
+type SyncInformationReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SyncType      SyncInformationType    `protobuf:"varint,1,opt,name=syncType,proto3,enum=yuanbao_biz.SyncInformationType" json:"syncType,omitempty"` // 同步类型
+	BotVersion    string                 `protobuf:"bytes,2,opt,name=botVersion,proto3" json:"botVersion,omitempty"`                                   // 机器人版本
+	PluginVersion string                 `protobuf:"bytes,3,opt,name=pluginVersion,proto3" json:"pluginVersion,omitempty"`                             // 插件版本
+	CommandData   *SyncCommandsData      `protobuf:"bytes,11,opt,name=commandData,proto3" json:"commandData,omitempty"`                                // 命令数据（字段编号必须是11）
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncInformationReq) Reset() {
+	*x = SyncInformationReq{}
+	mi := &file_proto_biz_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncInformationReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncInformationReq) ProtoMessage() {}
+
+func (x *SyncInformationReq) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_biz_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncInformationReq.ProtoReflect.Descriptor instead.
+func (*SyncInformationReq) Descriptor() ([]byte, []int) {
+	return file_proto_biz_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SyncInformationReq) GetSyncType() SyncInformationType {
+	if x != nil {
+		return x.SyncType
+	}
+	return SyncInformationType_SYNC_INFORMATION_TYPE_UNSPECIFIED
+}
+
+func (x *SyncInformationReq) GetBotVersion() string {
+	if x != nil {
+		return x.BotVersion
+	}
+	return ""
+}
+
+func (x *SyncInformationReq) GetPluginVersion() string {
+	if x != nil {
+		return x.PluginVersion
+	}
+	return ""
+}
+
+func (x *SyncInformationReq) GetCommandData() *SyncCommandsData {
+	if x != nil {
+		return x.CommandData
+	}
+	return nil
+}
+
+// 同步信息响应
+type SyncInformationRsp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"` // 错误码
+	Msg           string                 `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`    // 错误信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncInformationRsp) Reset() {
+	*x = SyncInformationRsp{}
+	mi := &file_proto_biz_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncInformationRsp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncInformationRsp) ProtoMessage() {}
+
+func (x *SyncInformationRsp) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_biz_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncInformationRsp.ProtoReflect.Descriptor instead.
+func (*SyncInformationRsp) Descriptor() ([]byte, []int) {
+	return file_proto_biz_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SyncInformationRsp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *SyncInformationRsp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 var File_proto_biz_proto protoreflect.FileDescriptor
 
 const file_proto_biz_proto_rawDesc = "" +
@@ -1707,6 +1982,22 @@ const file_proto_biz_proto_rawDesc = "" +
 	"\theartbeat\x18\x05 \x01(\x0e2\x1a.yuanbao_biz.EnumHeartbeatR\theartbeat\"=\n" +
 	"\x15SendGroupHeartbeatRsp\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
+	"\x03msg\x18\x02 \x01(\tR\x03msg\"?\n" +
+	"\aCommand\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"\x88\x01\n" +
+	"\x10SyncCommandsData\x126\n" +
+	"\vbotCommands\x18\x01 \x03(\v2\x14.yuanbao_biz.CommandR\vbotCommands\x12<\n" +
+	"\x0epluginCommands\x18\x02 \x03(\v2\x14.yuanbao_biz.CommandR\x0epluginCommands\"\xd9\x01\n" +
+	"\x12SyncInformationReq\x12<\n" +
+	"\bsyncType\x18\x01 \x01(\x0e2 .yuanbao_biz.SyncInformationTypeR\bsyncType\x12\x1e\n" +
+	"\n" +
+	"botVersion\x18\x02 \x01(\tR\n" +
+	"botVersion\x12$\n" +
+	"\rpluginVersion\x18\x03 \x01(\tR\rpluginVersion\x12?\n" +
+	"\vcommandData\x18\v \x01(\v2\x1d.yuanbao_biz.SyncCommandsDataR\vcommandData\":\n" +
+	"\x12SyncInformationRsp\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x10\n" +
 	"\x03msg\x18\x02 \x01(\tR\x03msg*Q\n" +
 	"\x0fEnumCLawMsgType\x12\x14\n" +
 	"\x10CLAW_MSG_UNKNOWN\x10\x00\x12\x12\n" +
@@ -1715,7 +2006,10 @@ const file_proto_biz_proto_rawDesc = "" +
 	"\rEnumHeartbeat\x12\x15\n" +
 	"\x11HEARTBEAT_UNKNOWN\x10\x00\x12\x15\n" +
 	"\x11HEARTBEAT_RUNNING\x10\x01\x12\x14\n" +
-	"\x10HEARTBEAT_FINISH\x10\x02B\x18Z\x16yuanbao-go/wsproto/bizb\x06proto3"
+	"\x10HEARTBEAT_FINISH\x10\x02*`\n" +
+	"\x13SyncInformationType\x12%\n" +
+	"!SYNC_INFORMATION_TYPE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eSYNC_INFORMATION_TYPE_COMMANDS\x10\x01B\x18Z\x16yuanbao-go/wsproto/bizb\x06proto3"
 
 var (
 	file_proto_biz_proto_rawDescOnce sync.Once
@@ -1729,52 +2023,61 @@ func file_proto_biz_proto_rawDescGZIP() []byte {
 	return file_proto_biz_proto_rawDescData
 }
 
-var file_proto_biz_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_biz_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_proto_biz_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_proto_biz_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_proto_biz_proto_goTypes = []any{
 	(EnumCLawMsgType)(0),            // 0: yuanbao_biz.EnumCLawMsgType
 	(EnumHeartbeat)(0),              // 1: yuanbao_biz.EnumHeartbeat
-	(*ImMsgSeq)(nil),                // 2: yuanbao_biz.ImMsgSeq
-	(*ImImageInfoArray)(nil),        // 3: yuanbao_biz.ImImageInfoArray
-	(*MsgContent)(nil),              // 4: yuanbao_biz.MsgContent
-	(*MsgBodyElement)(nil),          // 5: yuanbao_biz.MsgBodyElement
-	(*LogInfoExt)(nil),              // 6: yuanbao_biz.LogInfoExt
-	(*SendC2CMessageReq)(nil),       // 7: yuanbao_biz.SendC2CMessageReq
-	(*SendC2CMessageRsp)(nil),       // 8: yuanbao_biz.SendC2CMessageRsp
-	(*SendGroupMessageReq)(nil),     // 9: yuanbao_biz.SendGroupMessageReq
-	(*SendGroupMessageRsp)(nil),     // 10: yuanbao_biz.SendGroupMessageRsp
-	(*InboundMessagePush)(nil),      // 11: yuanbao_biz.InboundMessagePush
-	(*GetGroupMemberListReq)(nil),   // 12: yuanbao_biz.GetGroupMemberListReq
-	(*GetGroupMemberListRsp)(nil),   // 13: yuanbao_biz.GetGroupMemberListRsp
-	(*Member)(nil),                  // 14: yuanbao_biz.Member
-	(*QueryGroupInfoReq)(nil),       // 15: yuanbao_biz.QueryGroupInfoReq
-	(*QueryGroupInfoRsp)(nil),       // 16: yuanbao_biz.QueryGroupInfoRsp
-	(*GroupInfo)(nil),               // 17: yuanbao_biz.GroupInfo
-	(*SendPrivateHeartbeatReq)(nil), // 18: yuanbao_biz.SendPrivateHeartbeatReq
-	(*SendPrivateHeartbeatRsp)(nil), // 19: yuanbao_biz.SendPrivateHeartbeatRsp
-	(*SendGroupHeartbeatReq)(nil),   // 20: yuanbao_biz.SendGroupHeartbeatReq
-	(*SendGroupHeartbeatRsp)(nil),   // 21: yuanbao_biz.SendGroupHeartbeatRsp
+	(SyncInformationType)(0),        // 2: yuanbao_biz.SyncInformationType
+	(*ImMsgSeq)(nil),                // 3: yuanbao_biz.ImMsgSeq
+	(*ImImageInfoArray)(nil),        // 4: yuanbao_biz.ImImageInfoArray
+	(*MsgContent)(nil),              // 5: yuanbao_biz.MsgContent
+	(*MsgBodyElement)(nil),          // 6: yuanbao_biz.MsgBodyElement
+	(*LogInfoExt)(nil),              // 7: yuanbao_biz.LogInfoExt
+	(*SendC2CMessageReq)(nil),       // 8: yuanbao_biz.SendC2CMessageReq
+	(*SendC2CMessageRsp)(nil),       // 9: yuanbao_biz.SendC2CMessageRsp
+	(*SendGroupMessageReq)(nil),     // 10: yuanbao_biz.SendGroupMessageReq
+	(*SendGroupMessageRsp)(nil),     // 11: yuanbao_biz.SendGroupMessageRsp
+	(*InboundMessagePush)(nil),      // 12: yuanbao_biz.InboundMessagePush
+	(*GetGroupMemberListReq)(nil),   // 13: yuanbao_biz.GetGroupMemberListReq
+	(*GetGroupMemberListRsp)(nil),   // 14: yuanbao_biz.GetGroupMemberListRsp
+	(*Member)(nil),                  // 15: yuanbao_biz.Member
+	(*QueryGroupInfoReq)(nil),       // 16: yuanbao_biz.QueryGroupInfoReq
+	(*QueryGroupInfoRsp)(nil),       // 17: yuanbao_biz.QueryGroupInfoRsp
+	(*GroupInfo)(nil),               // 18: yuanbao_biz.GroupInfo
+	(*SendPrivateHeartbeatReq)(nil), // 19: yuanbao_biz.SendPrivateHeartbeatReq
+	(*SendPrivateHeartbeatRsp)(nil), // 20: yuanbao_biz.SendPrivateHeartbeatRsp
+	(*SendGroupHeartbeatReq)(nil),   // 21: yuanbao_biz.SendGroupHeartbeatReq
+	(*SendGroupHeartbeatRsp)(nil),   // 22: yuanbao_biz.SendGroupHeartbeatRsp
+	(*Command)(nil),                 // 23: yuanbao_biz.Command
+	(*SyncCommandsData)(nil),        // 24: yuanbao_biz.SyncCommandsData
+	(*SyncInformationReq)(nil),      // 25: yuanbao_biz.SyncInformationReq
+	(*SyncInformationRsp)(nil),      // 26: yuanbao_biz.SyncInformationRsp
 }
 var file_proto_biz_proto_depIdxs = []int32{
-	3,  // 0: yuanbao_biz.MsgContent.imageInfoArray:type_name -> yuanbao_biz.ImImageInfoArray
-	4,  // 1: yuanbao_biz.MsgBodyElement.msgContent:type_name -> yuanbao_biz.MsgContent
-	5,  // 2: yuanbao_biz.SendC2CMessageReq.msgBody:type_name -> yuanbao_biz.MsgBodyElement
-	6,  // 3: yuanbao_biz.SendC2CMessageReq.logExt:type_name -> yuanbao_biz.LogInfoExt
-	5,  // 4: yuanbao_biz.SendGroupMessageReq.msgBody:type_name -> yuanbao_biz.MsgBodyElement
-	6,  // 5: yuanbao_biz.SendGroupMessageReq.logExt:type_name -> yuanbao_biz.LogInfoExt
-	5,  // 6: yuanbao_biz.InboundMessagePush.msgBody:type_name -> yuanbao_biz.MsgBodyElement
-	2,  // 7: yuanbao_biz.InboundMessagePush.recallMsgSeqList:type_name -> yuanbao_biz.ImMsgSeq
+	4,  // 0: yuanbao_biz.MsgContent.imageInfoArray:type_name -> yuanbao_biz.ImImageInfoArray
+	5,  // 1: yuanbao_biz.MsgBodyElement.msgContent:type_name -> yuanbao_biz.MsgContent
+	6,  // 2: yuanbao_biz.SendC2CMessageReq.msgBody:type_name -> yuanbao_biz.MsgBodyElement
+	7,  // 3: yuanbao_biz.SendC2CMessageReq.logExt:type_name -> yuanbao_biz.LogInfoExt
+	6,  // 4: yuanbao_biz.SendGroupMessageReq.msgBody:type_name -> yuanbao_biz.MsgBodyElement
+	7,  // 5: yuanbao_biz.SendGroupMessageReq.logExt:type_name -> yuanbao_biz.LogInfoExt
+	6,  // 6: yuanbao_biz.InboundMessagePush.msgBody:type_name -> yuanbao_biz.MsgBodyElement
+	3,  // 7: yuanbao_biz.InboundMessagePush.recallMsgSeqList:type_name -> yuanbao_biz.ImMsgSeq
 	0,  // 8: yuanbao_biz.InboundMessagePush.clawMsgType:type_name -> yuanbao_biz.EnumCLawMsgType
-	6,  // 9: yuanbao_biz.InboundMessagePush.logExt:type_name -> yuanbao_biz.LogInfoExt
-	14, // 10: yuanbao_biz.GetGroupMemberListRsp.memberList:type_name -> yuanbao_biz.Member
-	17, // 11: yuanbao_biz.QueryGroupInfoRsp.groupInfo:type_name -> yuanbao_biz.GroupInfo
+	7,  // 9: yuanbao_biz.InboundMessagePush.logExt:type_name -> yuanbao_biz.LogInfoExt
+	15, // 10: yuanbao_biz.GetGroupMemberListRsp.memberList:type_name -> yuanbao_biz.Member
+	18, // 11: yuanbao_biz.QueryGroupInfoRsp.groupInfo:type_name -> yuanbao_biz.GroupInfo
 	1,  // 12: yuanbao_biz.SendPrivateHeartbeatReq.heartbeat:type_name -> yuanbao_biz.EnumHeartbeat
 	1,  // 13: yuanbao_biz.SendGroupHeartbeatReq.heartbeat:type_name -> yuanbao_biz.EnumHeartbeat
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	23, // 14: yuanbao_biz.SyncCommandsData.botCommands:type_name -> yuanbao_biz.Command
+	23, // 15: yuanbao_biz.SyncCommandsData.pluginCommands:type_name -> yuanbao_biz.Command
+	2,  // 16: yuanbao_biz.SyncInformationReq.syncType:type_name -> yuanbao_biz.SyncInformationType
+	24, // 17: yuanbao_biz.SyncInformationReq.commandData:type_name -> yuanbao_biz.SyncCommandsData
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_proto_biz_proto_init() }
@@ -1787,8 +2090,8 @@ func file_proto_biz_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_biz_proto_rawDesc), len(file_proto_biz_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   20,
+			NumEnums:      3,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

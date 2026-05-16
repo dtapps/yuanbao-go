@@ -105,6 +105,13 @@ func (c *Client) GetTokenManager() *token.Manager {
 	return c.plugin.GetTokenManager()
 }
 
+// SyncCommands 同步命令列表到服务器
+// botCommands: 机器人内置命令列表
+// pluginCommands: 插件自定义命令列表
+func (c *Client) SyncCommands(botCommands, pluginCommands []types.BotCommand) error {
+	return c.plugin.SyncCommands(botCommands, pluginCommands)
+}
+
 // Stop 停止客户端
 func (c *Client) Stop() error {
 	return c.plugin.Stop()

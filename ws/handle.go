@@ -7,6 +7,7 @@ import (
 	"github.com/dtapps/yuanbao-go/logger"
 	"github.com/dtapps/yuanbao-go/message"
 	"github.com/dtapps/yuanbao-go/types"
+	bizProto "github.com/dtapps/yuanbao-go/wsproto/biz"
 	connProto "github.com/dtapps/yuanbao-go/wsproto/conn"
 	"google.golang.org/protobuf/proto"
 )
@@ -66,6 +67,9 @@ func (c *WsClient) handleMessage(data []byte) {
 		case "ping":
 			// Ping
 			c.handleResponseTypePing(connMsg)
+		case "sync_information":
+			// 同步信息响应
+			c.handleResponseTypeSyncInformation(connMsg)
 		case "send_c2c_message":
 			// 发送私消息
 		case "send_group_message":
@@ -166,6 +170,31 @@ func (c *WsClient) handleResponseTypePing(connMsg *connProto.ConnMsg) {
 	c.log.Debug("Ping响应",
 		logger.F("ping", ping),
 	)
+}
+
+// handleResponseTypeSyncInformation 处理同步信息响应
+func (c *WsClient) handleResponseTypeSyncInformation(connMsg *connProto.ConnMsg) {
+	// 解析 SyncInformation 响应
+	rsp := &bizProto.SyncInformationRsp{}
+	err := proto.Unmarshal(connMsg.Data, rsp)
+	if err != nil {
+		c.log.Error("解析 SyncInformation 响应失败", logger.F("error", err))
+		return
+	}
+
+	c.log.Info("[同步] SyncInformation 响应",
+		logger.F("code", rsp.Code),
+		logger.F("msg", rsp.Msg),
+	)
+
+	if rsp.Code != 0 {
+		c.log.Warn("[同步] 返回非零码",
+			logger.F("code", rsp.Code),
+			logger.F("msg", rsp.Msg),
+		)
+	} else {
+		c.log.Info("[同步] 命令同步成功")
+	}
 }
 
 // handleResponseTypeInboundMessage 处理消息推送

@@ -8,8 +8,8 @@
 
 | 协议 | JSON 文件路径 |
 |------|--------------|
-| Conn 连接层 | `openclaw-plugin-yuanbao/dist/src/yuanbao-server/ws/proto/conn.json` |
-| Biz 业务层 | `openclaw-plugin-yuanbao/dist/src/yuanbao-server/ws/proto/biz.json` |
+| Conn 连接层 | `openclaw-plugin-yuanbao/dist/src/access/ws/proto/conn.json` |
+| Biz 业务层 | `openclaw-plugin-yuanbao/dist/src/access/ws/proto/biz.json` |
 
 ### 本地 Proto 文件
 
@@ -26,11 +26,11 @@
 
 ```bash
 # 统计 conn.json 中的 message 和 enum 数量
-grep -n '"fields":' openclaw-plugin-yuanbao/dist/src/yuanbao-server/ws/proto/conn.json
-grep -n '"values":' openclaw-plugin-yuanbao/dist/src/yuanbao-server/ws/proto/conn.json
+grep -n '"fields":' openclaw-plugin-yuanbao/dist/src/access/ws/proto/conn.json
+grep -n '"values":' openclaw-plugin-yuanbao/dist/src/access/ws/proto/conn.json
 
 # 提取所有定义名称
-grep -B2 '"fields":' openclaw-plugin-yuanbao/dist/src/yuanbao-server/ws/proto/conn.json | grep -v '"fields"'
+grep -B2 '"fields":' openclaw-plugin-yuanbao/dist/src/access/ws/proto/conn.json | grep -v '"fields"'
 ```
 
 ### 2. 对比本地 proto 文件
@@ -105,8 +105,13 @@ grep -n '^message\|^enum' yuanbao-go/proto/biz.proto
 | 18 | EnumHeartbeat | enum | ✅ |
 | 19 | SendPrivateHeartbeatReq | message | ✅ |
 | 20 | SendPrivateHeartbeatRsp | message | ✅ |
-| 21 | SendGroupHeartbeatReq | message | ✅ |
-| 22 | SendGroupHeartbeatRsp | message | ✅ |
+| 20 | SendGroupHeartbeatReq | message | ✅ |
+| 21 | SendGroupHeartbeatRsp | message | ✅ |
+| 22 | SyncInformationType | enum | ✅ |
+| 23 | Command | message | ✅ |
+| 24 | SyncCommandsData | message | ✅ |
+| 25 | SyncInformationReq | message | ✅ |
+| 26 | SyncInformationRsp | message | ✅ |
 
 ---
 

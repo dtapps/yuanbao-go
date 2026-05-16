@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dtapps/yuanbao-go/logger"
+	"github.com/dtapps/yuanbao-go/message"
 	"github.com/dtapps/yuanbao-go/types"
 	"github.com/dtapps/yuanbao-go/utils"
 	bizProto "github.com/dtapps/yuanbao-go/wsproto/biz"
@@ -87,9 +88,9 @@ type WsClient struct {
 	// === 有序发送队列 ===
 	// 所有业务消息（C2C/Group）通过此队列串行发送，
 	// 保证无论调用方如何并发，消息都按入队顺序发出。
-	sendQueue   chan sendTask     // 任务队列（有缓冲）
-	sendOnce    sync.Once         // 确保 sender 只启动一次
-	senderDone  chan struct{}     // 用于通知 sender 退出
+	sendQueue  chan sendTask // 任务队列（有缓冲）
+	sendOnce   sync.Once     // 确保 sender 只启动一次
+	senderDone chan struct{} // 用于通知 sender 退出
 
 	// 上下文
 	ctx    context.Context
@@ -413,4 +414,75 @@ func (c *WsClient) generateNextMsgSeq() uint64 {
 		c.msgSeq = 1
 	}
 	return c.msgSeq
+}
+
+// SyncInformation 同步信息（如命令列表）到服务器
+func (c *WsClient) SyncInformation(data *types.SyncInformationData) error {
+	c.log.Info("[同步] 发送 SyncInformation 请求",
+		logger.F("syncType", data.SyncType),
+		logger.F("botVersion", data.BotVersion),
+		logger.F("pluginVersion", data.PluginVersion),
+	)
+
+	c.mu.RLock()
+	conn := c.conn
+	c.mu.RUnlock()
+
+	if conn == nil {
+		return fmt.Errorf("连接未建立")
+	}
+
+	// 构建 proto 消息
+	req := &bizProto.SyncInformationReq{
+		SyncType:      bizProto.SyncInformationType(data.SyncType),
+		BotVersion:    data.BotVersion,
+		PluginVersion: data.PluginVersion,
+		CommandData: &bizProto.SyncCommandsData{
+			BotCommands:    botCommandsToProto(data.CommandData.BotCommands),
+			PluginCommands: botCommandsToProto(data.CommandData.PluginCommands),
+		},
+	}
+
+	// 编码为二进制
+	encoded, err := utils.EncodeBizPB(req)
+	if err != nil {
+		c.log.Error("编码 SyncInformationReq 失败", logger.F("error", err.Error()))
+		return fmt.Errorf("编码失败：%w", err)
+	}
+
+	// 构建业务请求消息
+	reqParams := message.BuildBizRequestParams{
+		SeqNo:   c.generateNextSeqNo(),
+		Cmd:     string(types.BizCmdSyncInformation),
+		Module:  string(types.ModuleYuanbaoOpenClawProxy),
+		MsgID:   message.GenerateMsgID(),
+		Payload: encoded,
+	}
+
+	reqData, err := message.BuildBizRequestMessage(reqParams)
+	if err != nil {
+		c.log.Error("构建 SyncInformation 请求失败", logger.F("error", err.Error()))
+		return fmt.Errorf("构建请求失败：%w", err)
+	}
+
+	// 发送请求
+	if err := conn.WriteMessage(websocket.BinaryMessage, reqData); err != nil {
+		c.log.Error("发送 SyncInformation 失败", logger.F("error", err.Error()))
+		return fmt.Errorf("发送失败：%w", err)
+	}
+
+	c.log.Info("[同步] SyncInformation 发送成功")
+	return nil
+}
+
+// botCommandsToProto BotCommand 转换为 proto 类型
+func botCommandsToProto(commands []types.BotCommand) []*bizProto.Command {
+	result := make([]*bizProto.Command, 0, len(commands))
+	for _, cmd := range commands {
+		result = append(result, &bizProto.Command{
+			Name:        cmd.Name,
+			Description: cmd.Description,
+		})
+	}
+	return result
 }

@@ -206,3 +206,35 @@ message SendGroupHeartbeatRsp {
     int32 code = 1; // 错误码
     string msg = 2; // 错误信息
 }
+
+// 同步信息类型枚举
+enum SyncInformationType {
+    SYNC_INFORMATION_TYPE_UNSPECIFIED = 0;  // 未指定
+    SYNC_INFORMATION_TYPE_COMMANDS = 1;     // 命令列表
+}
+
+// 机器人命令
+message Command {
+    string name = 1;        // 命令名称，如 /help
+    string description = 2; // 命令描述
+}
+
+// 同步命令数据
+message SyncCommandsData {
+    repeated Command botCommands = 1;    // 机器人命令列表
+    repeated Command pluginCommands = 2; // 插件命令列表
+}
+
+// 同步信息请求
+message SyncInformationReq {
+    SyncInformationType syncType = 1; // 同步类型
+    string botVersion = 2;            // 机器人版本
+    string pluginVersion = 3;         // 插件版本
+    SyncCommandsData commandData = 11; // 命令数据（字段编号必须是11）
+}
+
+// 同步信息响应
+message SyncInformationRsp {
+    int32 code = 1;    // 错误码
+    string msg = 2;    // 错误信息
+}

@@ -121,6 +121,37 @@ func BuildPushAckMessage(head *connProto.Head, params BuildPushAckMessageParams)
 	return data, nil
 }
 
+type BuildBizRequestParams struct {
+	SeqNo   uint32
+	Cmd     string
+	Module  string
+	MsgID   string
+	Payload []byte
+}
+
+// BuildBizRequestMessage 构建通用业务请求消息
+func BuildBizRequestMessage(params BuildBizRequestParams) ([]byte, error) {
+	// 公共数据
+	connMsg := &connProto.ConnMsg{
+		Head: &connProto.Head{
+			CmdType: uint32(types.CmdTypeRequest),
+			Cmd:     params.Cmd,
+			SeqNo:   params.SeqNo,
+			MsgId:   params.MsgID,
+			Module:  params.Module,
+		},
+		Data: params.Payload,
+	}
+
+	// Protobuf 编码
+	data, err := proto.Marshal(connMsg)
+	if err != nil {
+		return nil, fmt.Errorf("protobuf 编码失败：%w", err)
+	}
+
+	return data, nil
+}
+
 // ParsePingMessage 解析 ping 消息
 func ParsePingMessage(data []byte) (*connProto.PingRsp, error) {
 
