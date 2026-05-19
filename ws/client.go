@@ -288,16 +288,16 @@ func (c *WsClient) ScheduleReconnect() {
 // shouldRefreshToken 判断是否应该刷新token
 func (c *WsClient) shouldRefreshToken(code int) bool {
 	authFailedCodes := map[int]bool{
-		41103: true, // AUTH_TOKEN_INVALID
-		41104: true, // AUTH_TOKEN_EXPIRED
-		41108: true, // AUTH_TOKEN_FORCED_EXPIRATION
+		int(types.RetCodeAuthTokenInvalid):          true, // Token 无效
+		int(types.RetCodeAuthTokenExpired):          true, // Token 过期
+		int(types.RetCodeAuthTokenForcedExpiration): true, // Token 强制过期
 	}
 
 	retryableCodes := map[int]bool{
-		50400: true, // INNER_SVR_FAIL
-		50503: true, // OVERLOAD_CONTROL
-		90001: true, // NET_FAIL
-		90003: true, // BACKEND_RETURN_FAIL
+		int(types.RetCodeInnerSvrFail):    true, // 服务器内部错误
+		int(types.RetCodeOverloadControl): true, // 过载控制
+		int(types.RetCodeNetFail):         true, // 网络失败
+		int(types.RetCodeBackendFail):     true, // 后端返回失败
 	}
 
 	return authFailedCodes[code] || retryableCodes[code]

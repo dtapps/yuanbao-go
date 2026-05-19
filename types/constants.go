@@ -34,6 +34,31 @@ const (
 	InstanceId = "16"
 )
 
+// RetCode 错误码
+type RetCode int
+
+const (
+	// 成功
+	RetCodeSuccess RetCode = 0
+
+	// 认证相关错误码
+	RetCodeAuthFail                  RetCode = 40100 // 认证失败
+	RetCodeAlreadyAuth               RetCode = 41101 // 已经认证
+	RetCodeSameKindDevLogin          RetCode = 41102 // 同类型设备登录
+	RetCodeAuthTokenInvalid          RetCode = 41103 // Token 无效
+	RetCodeAuthTokenExpired          RetCode = 41104 // Token 过期
+	RetCodeAuthUserNotRegistered     RetCode = 41105 // 用户未注册
+	RetCodeAuthUserForbidden         RetCode = 41106 // 用户被禁止
+	RetCodeAuthUserUnqualified       RetCode = 41107 // 用户未达标
+	RetCodeAuthTokenForcedExpiration RetCode = 41108 // Token 强制过期
+
+	// 服务器错误码
+	RetCodeInnerSvrFail    RetCode = 50400 // 服务器内部错误
+	RetCodeOverloadControl RetCode = 50503 // 过载控制
+	RetCodeNetFail         RetCode = 90001 // 网络失败
+	RetCodeBackendFail     RetCode = 90003 // 后端返回失败
+)
+
 // ConnectionState 连接状态
 type ConnectionState string
 

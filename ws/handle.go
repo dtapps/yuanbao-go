@@ -19,9 +19,9 @@ func (c *WsClient) handleClose(code int, reason string) {
 		logger.F("reason", reason),
 	)
 
-	// c.mu.Lock()
-	// wasConnected := c.state == types.ConnectionStateConnected.String()
-	// c.mu.Unlock()
+	c.mu.Lock()
+	wasConnected := c.state == types.ConnectionStateConnected.String()
+	c.mu.Unlock()
 
 	c.stopHeartbeat()
 
@@ -36,10 +36,10 @@ func (c *WsClient) handleClose(code int, reason string) {
 	}
 
 	// 安排重连
-	// code=1008 reason=Invalid or expired token
-	// if wasConnected || code != 1008 {
-	// 	c.ScheduleReconnect()
-	// }
+	// 1000 = 正常关闭，不需要重连
+	if wasConnected && code != 1000 {
+		c.ScheduleReconnect()
+	}
 }
 
 // handleMessage 处理消息
@@ -116,16 +116,69 @@ func (c *WsClient) handleResponseTypeAuthBind(connMsg *connProto.ConnMsg) {
 	code := authBind.Code
 
 	// 检查错误码
-	if status != 0 && status != 41101 {
-		// 41101 = ALREADY_AUTH
+	if status != 0 && status != int32(types.RetCodeAlreadyAuth) {
 		c.log.Error("认证失败",
 			logger.F("status", status),
 			logger.F("code", code),
 		)
 
+		// 检查是否是 token 过期，需要刷新 token
+		if c.shouldRefreshToken(int(status)) && c.callback != nil {
+			c.log.Warn("Token 过期，尝试刷新",
+				logger.F("status", status),
+			)
+			c.close()
+			newAuth, err := c.callback.OnAuthFailed(int(status))
+			if err != nil {
+				c.log.Error("刷新 Token 失败", logger.F("error", err))
+				c.callback.OnError(fmt.Errorf("auth failed and refresh token failed: status=%d, err=%v", status, err))
+				return
+			}
+			if newAuth != nil {
+				c.log.Info("Token 刷新成功，重新连接")
+				c.auth = newAuth
+				c.ScheduleReconnect()
+			}
+			return
+		}
+
 		c.close()
 		if c.callback != nil {
 			c.callback.OnError(fmt.Errorf("auth failed: status=%d, code=%d", status, code))
+		}
+		return
+	}
+
+	// 检查业务层错误码
+	if code != 0 && code != int32(types.RetCodeAlreadyAuth) {
+		c.log.Error("认证业务失败",
+			logger.F("code", code),
+			logger.F("message", authBind.Message),
+		)
+
+		// 检查是否是 token 过期
+		if c.shouldRefreshToken(int(code)) && c.callback != nil {
+			c.log.Warn("Token 过期，尝试刷新",
+				logger.F("code", code),
+			)
+			c.close()
+			newAuth, err := c.callback.OnAuthFailed(int(code))
+			if err != nil {
+				c.log.Error("刷新 Token 失败", logger.F("error", err))
+				c.callback.OnError(fmt.Errorf("auth failed and refresh token failed: code=%d, err=%v", code, err))
+				return
+			}
+			if newAuth != nil {
+				c.log.Info("Token 刷新成功，重新连接")
+				c.auth = newAuth
+				c.ScheduleReconnect()
+			}
+			return
+		}
+
+		c.close()
+		if c.callback != nil {
+			c.callback.OnError(fmt.Errorf("auth failed: code=%d, message=%s", code, authBind.Message))
 		}
 		return
 	}
