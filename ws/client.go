@@ -72,6 +72,7 @@ type WsClient struct {
 	maxReconnectAttempts int
 	reconnectDelays      []time.Duration
 	reconnectTimer       *time.Timer
+	manualDisconnect     bool // 是否手动断开，用于区分主动关闭和异常断开
 
 	// 回调
 	callback WsClientCallback
@@ -337,6 +338,7 @@ func (c *WsClient) close() {
 // Disconnect 断开连接
 func (c *WsClient) Disconnect() error {
 	c.mu.Lock()
+	c.manualDisconnect = true
 	c.state = types.ConnectionStateDisconnected.String()
 	c.mu.Unlock()
 
